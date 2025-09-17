@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Wild Hunt – First Person</title>
+  <style>
+    body { margin:0; overflow:hidden; background:#222; }
+    canvas { display:block; }
+    #crosshair {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px; height: 20px;
+      border: 2px solid red;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    #hud {
+      position: fixed;
+      top: 10px; left: 10px;
+      color: white;
+      font-family: sans-serif;
+      font-size: 18px;
+      background: rgba(0,0,0,0.4);
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="crosshair"></div>
+  <div id="hud">Ammo: <span id="ammo">5</span></div>
+
+  <script>
+  // -------- Minimal Three.js Build ---------
+  // Lightweight build (core + basics) from https://unpkg.com/three/build/three.min.js
+  // For offline use, you’d normally paste the full lib here. To keep file size readable,
+  // I’m using an inline fetch trick:
+  const script = document.createElement('script');
+  script.src = "https://unpkg.com/three/build/three.min.js";
+  script.onload = init;
+  document.head.appendChild(script);
+
+  function init(){
+    // Basic setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.set(0,1.6,5);
+
+    const renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Ground
+    const groundGeo = new THREE.PlaneGeometry(100,100);
+    const groundMat = new THREE.MeshLambertMaterial({color:0x228B22});
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI/2;
+    scene.add(ground);
+
+    // Light
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+    hemiLight.position.set(0,20,0);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(-3,10,-10);
+    scene.add(dirLight);
+
+    // Simple "animal"
+    const deerGeo = new THREE.BoxGeometry(1,1,2);
+    const deerMat = new THREE.MeshLambertMaterial({color:0x8B4513});
+    const deer = new THREE.Mesh(deerGeo, deerMat);
+    deer.position.set(0,0.5,-10);
+    scene.add(deer);
+
+    // Ammo + shooting
+    let ammo = 5;
+    const ammoDisplay = document.getElementById("ammo");
+    window.addEventListener("click", ()=>{
+      if(ammo<=0) return;
+      ammo--;
+      ammoDisplay.textContent = ammo;
+
+      // Raycast
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera({x:0,y:0}, camera);
+      const hits = raycaster.intersectObject(deer);
+      if(hits.length>0){
+        deer.material.color.set(0xff0000); // hit!
+        setTimeout(()=>scene.remove(deer),500);
+      }
+    });
+
+    // Movement controls (WASD + mouse look)
+    let keys = {};
+    document.addEventListener("keydown", e=> keys[e.code]=true);
+    document.addEventListener("keyup", e=> keys[e.code]=false);
+
+    let pitch = 0, yaw = 0;
+    document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock;
+    document.body.onclick = ()=>document.body.requestPointerLock();
+    document.addEventListener("mousemove", e=>{
+      if(document.pointerLockElement===document.body){
+        yaw -= e.movementX*0.002;
+        pitch -= e.movementY*0.002;
+        pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+      }
+    });
+
+    function animate(){
+      requestAnimationFrame(animate);
+
+      // Move
+      const speed = 0.1;
+      const forward = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+      const right = new THREE.Vector3(forward.z,0,-forward.x);
+      if(keys["KeyW"]) camera.position.addScaledVector(forward,-speed);
+      if(keys["KeyS"]) camera.position.addScaledVector(forward,speed);
+      if(keys["KeyA"]) camera.position.addScaledVector(right,-speed);
+      if(keys["KeyD"]) camera.position.addScaledVector(right,speed);
+
+      camera.rotation.set(pitch,yaw,0);
+      renderer.render(scene,camera);
+    }
+    animate();
+
+    window.addEventListener("resize", ()=>{
+      camera.aspect=window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth,window.innerHeight);
+    });
+  }
+  </script>
+</body>
+</html>
