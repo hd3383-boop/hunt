@@ -1,1047 +1,138 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WildTracker — First-Person Hunting Demo</title>
+  <meta charset="UTF-8">
+  <title>Wild Hunt – First Person</title>
   <style>
-    html,body { height:100%; margin:0; background:#0a0a0e; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; color:#dfe6ee; overflow:hidden; }
-    #game { width:100vw; height:100vh; display:block; position:relative; }
-    canvas { display:block; } /* three renderer */
-
-    /* HUD */
+    body { margin:0; overflow:hidden; background:#222; }
+    canvas { display:block; }
+    #crosshair {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px; height: 20px;
+      border: 2px solid red;
+      border-radius: 50%;
+      pointer-events: none;
+    }
     #hud {
-      position: absolute; left: 0; right: 0; top: 0; pointer-events: none;
-      display:flex; flex-direction:column; gap:6px; padding:12px;
-    }
-    .topbar { display:flex; justify-content:space-between; align-items:center; pointer-events:none; }
-    .status {
-      background:rgba(10,12,16,0.6); padding:8px 12px; border-radius:8px; display:flex; gap:12px; align-items:center;
-      font-size:13px;
-    }
-    .status b { font-weight:600; margin-right:6px; color:#fff;}
-    .crosshair {
-      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:36px; height:36px; pointer-events:none;
-      display:flex; align-items:center; justify-content:center;
-    }
-    .crosshair:before,.crosshair:after{
-      content:''; position:absolute; width:2px; height:16px; background:rgba(255,255,255,0.85); border-radius:2px;
-    }
-    .crosshair:before{ transform:translateX(-10px) rotate(90deg); }
-    .crosshair:after{ transform:translateX(10px) rotate(90deg); }
-    .crosshair .dot{ width:6px; height:6px; background:rgba(255,255,255,0.95); border-radius:50%; }
-    #hud .bottom-left { position:absolute; left:12px; bottom:12px; pointer-events:none; }
-    #hud .bottom-right { position:absolute; right:12px; bottom:12px; pointer-events:none; display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
-
-    .mini-map {
-      width:160px; height:160px; border-radius:8px; background:rgba(12,14,18,0.6); padding:6px; box-sizing:border-box;
-      display:flex; flex-direction:column; gap:6px; align-items:center;
-    }
-    .mini-map canvas { background:rgba(0,0,0,0.05); border-radius:6px; }
-    .compass { padding:6px 10px; border-radius:6px; background:rgba(0,0,0,0.12); font-size:13px; }
-    .weapon-box { padding:8px 12px; border-radius:8px; background:linear-gradient(180deg, rgba(10,10,12,0.65), rgba(0,0,0,0.2)); font-size:14px; pointer-events:none; }
-
-    /* overlay/menus */
-    #overlay {
-      position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:auto;
-    }
-    #overlay .menu {
-      background:rgba(3,5,8,0.9); padding:22px; border-radius:12px; width:560px; color:#cfe6ff;
-      box-shadow:0 10px 30px rgba(0,0,0,0.6); font-size:14px;
-    }
-    #overlay h1 { margin:0 0 8px 0; font-size:20px; }
-    #overlay p { margin:0 0 10px 0; color:#b8d2ff; font-size:13px; }
-    .btn { margin-top:12px; background:#1d8fff; color:white; padding:10px 14px; border-radius:8px; cursor:pointer; display:inline-block; text-align:center; }
-    .hint { font-size:13px; color:#98b2d9; margin-top:8px; }
-
-    /* small helpful labels */
-    .label { font-size:12px; color:#caddff; }
-
-    /* mobile friendly tweaks */
-    @media (max-width:640px){
-      .mini-map { width:120px; height:120px; }
+      position: fixed;
+      top: 10px; left: 10px;
+      color: white;
+      font-family: sans-serif;
+      font-size: 18px;
+      background: rgba(0,0,0,0.4);
+      padding: 8px 12px;
+      border-radius: 8px;
     }
   </style>
 </head>
 <body>
-  <div id="game"></div>
+  <div id="crosshair"></div>
+  <div id="hud">Ammo: <span id="ammo">5</span></div>
 
-  <div id="hud">
-    <div class="topbar">
-      <div class="status">
-        <div id="timeOfDay" class="label">Day</div>
-        <div id="windInfo" class="label">Wind: N</div>
-        <div id="staminaInfo" class="label">Stamina: 100%</div>
-      </div>
-      <div class="status">
-        <div id="ammoInfo" class="label">Rifle: 10 / 30</div>
-        <div id="weaponInfo" class="label">Weapon: Rifle</div>
-      </div>
-    </div>
+  <script>
+  // -------- Minimal Three.js Build ---------
+  // Lightweight build (core + basics) from https://unpkg.com/three/build/three.min.js
+  // For offline use, you’d normally paste the full lib here. To keep file size readable,
+  // I’m using an inline fetch trick:
+  const script = document.createElement('script');
+  script.src = "https://unpkg.com/three/build/three.min.js";
+  script.onload = init;
+  document.head.appendChild(script);
 
-    <div class="crosshair"><div class="dot"></div></div>
-
-    <div class="bottom-left">
-      <div class="weapon-box" id="controlsBox">
-        <div><b>Controls</b> — WASD walk • Shift sprint • Ctrl crouch • Space jump</div>
-        <div>Left click: fire • Right click: aim • R: reload • 1/2: switch (Rifle/Bow)</div>
-      </div>
-    </div>
-
-    <div class="bottom-right">
-      <div class="mini-map">
-        <canvas id="minimap" width="140" height="140"></canvas>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <div id="compass" class="compass">N</div>
-          <div id="windArrow" class="label">➤</div>
-        </div>
-      </div>
-      <div class="weapon-box" id="hudWeapon">Rifle • 10 / 30</div>
-    </div>
-  </div>
-
-  <div id="overlay">
-    <div class="menu" id="mainMenu">
-      <h1>WildTracker — Hunting Demo</h1>
-      <p>First-person hunting sandbox: practice stealth, track animals, and take your shot. Built with Three.js — low-poly, procedural world.</p>
-      <div class="hint">Click below then click the game area to lock mouse and play. Press <b>Esc</b> to unlock.</div>
-      <div class="btn" id="startBtn">Start Hunting</div>
-      <div style="margin-top:12px; color:#a9c6ff; font-size:13px;">
-        Tips: crouch to reduce noise, use wind indicator to approach downwind, and try the bow for stealth.
-      </div>
-    </div>
-  </div>
-
-  <!-- Module script: Three.js + PointerLockControls imported as ES modules -->
-  <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.155.0/build/three.module.js';
-    import { PointerLockControls } from 'https://unpkg.com/three@0.155.0/examples/jsm/controls/PointerLockControls.js';
-
-    // -- Game constants and utilities --
-    const GAME = {
-      terrainSize: 1200,
-      terrainSegments: 128,     // keep moderate for performance
-      seed: 12345,
-      animalCount: 12,
-      dayLengthSec: 240,        // full day-night cycle (seconds)
-      fogDistance: 800,
-      maxViewDistance: 1000,
-    };
-
-    function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
-    function lerp(a,b,t){ return a + (b-a)*t; }
-    function randRange(a,b){ return a + Math.random()*(b-a); }
-    function intRand(a,b){ return Math.floor(randRange(a,b+1)); }
-
-    // Simple seeded RNG (mulberry32)
-    function createRNG(seed){
-      let t = seed >>> 0;
-      return function(){
-        t += 0x6D2B79F5;
-        var r = Math.imul(t ^ t>>>15, 1 | t);
-        r ^= r + Math.imul(r ^ r>>>7, 61 | r);
-        return ((r ^ r>>>14) >>> 0) / 4294967296;
-      };
-    }
-
-    const rng = createRNG(GAME.seed);
-
-    // Simple value-noise 2D (grid-based) used for terrain height
-    class ValueNoise {
-      constructor(gridSize=256){
-        this.gridSize = gridSize;
-        this.values = new Float32Array((gridSize+1)*(gridSize+1));
-        for(let y=0;y<=gridSize;y++){
-          for(let x=0;x<=gridSize;x++){
-            this.values[y*(gridSize+1)+x] = rng()*2-1;
-          }
-        }
-      }
-      smoothstep(t){ return t*t*(3-2*t); }
-      get(x,y){
-        const gs = this.gridSize;
-        x = x*(gs); y = y*(gs);
-        const x0 = Math.floor(x), y0 = Math.floor(y);
-        const sx = this.smoothstep(x - x0);
-        const sy = this.smoothstep(y - y0);
-        const v00 = this.values[(y0% (gs+1))*(gs+1) + (x0%(gs+1))];
-        const v10 = this.values[(y0% (gs+1))*(gs+1) + ((x0+1)%(gs+1))];
-        const v01 = this.values[((y0+1)%(gs+1))*(gs+1) + (x0%(gs+1))];
-        const v11 = this.values[((y0+1)%(gs+1))*(gs+1) + ((x0+1)%(gs+1))];
-        const ix0 = lerp(v00,v10,sx);
-        const ix1 = lerp(v01,v11,sx);
-        return lerp(ix0,ix1,sy);
-      }
-    }
-
-    // -- Scene, Camera, Renderer --
-    const container = document.getElementById('game');
+  function init(){
+    // Basic setup
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x97c1ff, 0.0005);
+    scene.background = new THREE.Color(0x87ceeb);
 
-    const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, GAME.maxViewDistance);
-    camera.position.set(0, 8, 0);
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.set(0,1.6,5);
 
-    const renderer = new THREE.WebGLRenderer({ antialias:true });
-    renderer.setSize(innerWidth, innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    container.appendChild(renderer.domElement);
+    const renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-    // Controls (Pointer lock)
-    const controls = new PointerLockControls(camera, renderer.domElement);
-    document.getElementById('startBtn').addEventListener('click', ()=> {
-      controls.lock();
-    });
-    // overlay hide when locked
-    controls.addEventListener('lock', ()=> { document.getElementById('overlay').style.display = 'none'; });
-    controls.addEventListener('unlock', ()=> { document.getElementById('overlay').style.display = 'flex'; });
+    // Ground
+    const groundGeo = new THREE.PlaneGeometry(100,100);
+    const groundMat = new THREE.MeshLambertMaterial({color:0x228B22});
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI/2;
+    scene.add(ground);
 
-    // handle resize
-    window.addEventListener('resize', ()=> {
-      camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
-    });
+    // Light
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+    hemiLight.position.set(0,20,0);
+    scene.add(hemiLight);
 
-    // -- Lighting / Sun / DayNight --
-    const hemi = new THREE.HemisphereLight(0xcfefff, 0x5a4b3b, 0.5);
-    scene.add(hemi);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(-3,10,-10);
+    scene.add(dirLight);
 
-    const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048,2048);
-    sun.shadow.camera.left = -600; sun.shadow.camera.right = 600;
-    sun.shadow.camera.top = 600; sun.shadow.camera.bottom = -600;
-    sun.shadow.camera.near = 1; sun.shadow.camera.far = 1500;
-    sun.position.set(100, 300, 120);
-    scene.add(sun);
+    // Simple "animal"
+    const deerGeo = new THREE.BoxGeometry(1,1,2);
+    const deerMat = new THREE.MeshLambertMaterial({color:0x8B4513});
+    const deer = new THREE.Mesh(deerGeo, deerMat);
+    deer.position.set(0,0.5,-10);
+    scene.add(deer);
 
-    // subtle ambient
-    const ambient = new THREE.AmbientLight(0x223344, 0.25);
-    scene.add(ambient);
+    // Ammo + shooting
+    let ammo = 5;
+    const ammoDisplay = document.getElementById("ammo");
+    window.addEventListener("click", ()=>{
+      if(ammo<=0) return;
+      ammo--;
+      ammoDisplay.textContent = ammo;
 
-    // sky color control
-    function updateLighting(timeOfDayRatio){
-      // timeOfDayRatio: 0..1 (0 = midnight, 0.5 = midday)
-      const dayFactor = Math.max(0, Math.cos((timeOfDayRatio-0.5)*Math.PI*2)*0.5 + 0.5);
-      const skyColor = new THREE.Color().setHSL(0.58, lerp(0.3,0.7,dayFactor), lerp(0.06,0.6,dayFactor));
-      renderer.setClearColor(skyColor);
-      scene.fog.color.copy(skyColor);
-      hemi.intensity = lerp(0.2, 0.9, dayFactor);
-      ambient.intensity = lerp(0.1, 0.5, dayFactor);
-      sun.intensity = lerp(0.15, 1.0, dayFactor);
-      // move sun across sky
-      const angle = timeOfDayRatio * Math.PI * 2; // full rotation per day
-      const r = 600;
-      sun.position.set(Math.cos(angle)*r, Math.sin(angle)*r, Math.sin(angle*0.5)*r*0.5);
-      sun.lookAt(0,0,0);
-    }
-
-    // -- Terrain generation --
-    const noise = new ValueNoise(256);
-    const terrainGeo = new THREE.PlaneGeometry(GAME.terrainSize, GAME.terrainSize, GAME.terrainSegments, GAME.terrainSegments);
-    terrainGeo.rotateX(-Math.PI/2);
-    const vpos = terrainGeo.attributes.position;
-    for(let i=0;i<vpos.count;i++){
-      const vx = vpos.getX(i), vz = vpos.getZ(i);
-      const nx = (vx / GAME.terrainSize) + 0.5;
-      const nz = (vz / GAME.terrainSize) + 0.5;
-      let h = 0;
-      h += noise.get(nx*1.0, nz*1.0) * 40;
-      h += noise.get(nx*4.0, nz*4.0) * 8;
-      h += noise.get(nx*12.0, nz*12.0) * 2.5;
-      // flatten near center for a small lake/flat area
-      const dist = Math.hypot(vx, vz);
-      if (dist < 80) h *= (dist/80);
-      vpos.setY(i, h);
-    }
-    terrainGeo.computeVertexNormals();
-    const terrainMat = new THREE.MeshStandardMaterial({ color:0x6a8a53, roughness:1.0 });
-    const terrain = new THREE.Mesh(terrainGeo, terrainMat);
-    terrain.receiveShadow = true;
-    scene.add(terrain);
-
-    // simple low-poly trees (instanced)
-    const treeCount = 220;
-    const treeGeometry = new THREE.ConeGeometry(4, 18, 6);
-    const treeTrunk = new THREE.CylinderGeometry(1.2,1.6,6,6);
-    const treeMaterial = new THREE.MeshStandardMaterial({ color:0x154a1a, flatShading:true });
-    const trunkMaterial = new THREE.MeshStandardMaterial({ color:0x4b2711 });
-    const treesParent = new THREE.Group();
-    scene.add(treesParent);
-    for(let i=0;i<treeCount;i++){
-      const x = randRange(-GAME.terrainSize/2, GAME.terrainSize/2);
-      const z = randRange(-GAME.terrainSize/2, GAME.terrainSize/2);
-      // get height at pos
-      const height = getTerrainHeightAt(x, z);
-      if (height < -4 || Math.hypot(x,z) < 40) continue; // avoid inside water/bowl
-      const trunk = new THREE.Mesh(treeTrunk, trunkMaterial);
-      trunk.position.set(x, height+3, z);
-      trunk.castShadow = true; trunk.receiveShadow = true;
-      const crown = new THREE.Mesh(treeGeometry, treeMaterial);
-      crown.position.set(0, 10, 0);
-      crown.scale.setScalar(1.0 + rng()*0.6);
-      trunk.add(crown);
-      trunk.rotation.y = rng()*Math.PI*2;
-      treesParent.add(trunk);
-    }
-
-    // small rocks / bushes (decor)
-    for(let i=0;i<120;i++){
-      const x = randRange(-GAME.terrainSize/2, GAME.terrainSize/2);
-      const z = randRange(-GAME.terrainSize/2, GAME.terrainSize/2);
-      const height = getTerrainHeightAt(x,z);
-      if (height < -4 || Math.hypot(x,z) < 30) continue;
-      const mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(1.4 + rng()*1.6), new THREE.MeshStandardMaterial({ color: 0x6b6b6b }));
-      mesh.position.set(x, height+1, z);
-      mesh.rotation.set(rng()*0.2, rng()*2*Math.PI, 0);
-      mesh.scale.setScalar(0.8 + rng()*1.6);
-      scene.add(mesh);
-    }
-
-    // grass (instanced simple planes)
-    const grassCount = 2200;
-    const grassGeo = new THREE.PlaneGeometry(1.2, 2.8);
-    const grassMat = new THREE.MeshStandardMaterial({ color:0x6faf56, side:THREE.DoubleSide });
-    for(let i=0;i<grassCount;i++){
-      const x = randRange(-GAME.terrainSize/2, GAME.terrainSize/2);
-      const z = randRange(-GAME.terrainSize/2, GAME.terrainSize/2);
-      const h = getTerrainHeightAt(x,z);
-      if (h < -4) continue;
-      const g = new THREE.Mesh(grassGeo, grassMat);
-      g.position.set(x, h+1.2, z);
-      g.rotation.y = rng()*Math.PI*2;
-      g.scale.setScalar(0.6 + rng()*1.2);
-      scene.add(g);
-    }
-
-    // get terrain height function (bilinear sample)
-    function getTerrainHeightAt(worldX, worldZ){
-      // convert to uv 0..1
-      const half = GAME.terrainSize/2;
-      const nx = (worldX + half) / GAME.terrainSize;
-      const nz = (worldZ + half) / GAME.terrainSize;
-      // sample with same noise layers used above
-      let h = 0;
-      h += noise.get(nx*1.0, nz*1.0) * 40;
-      h += noise.get(nx*4.0, nz*4.0) * 8;
-      h += noise.get(nx*12.0, nz*12.0) * 2.5;
-      const dist = Math.hypot(worldX, worldZ);
-      if (dist < 80) h *= (dist/80);
-      return h;
-    }
-
-    // -- Player state / movement / noise / stamina --
-    const player = {
-      speedWalk: 6.0, speedSprint: 12.0, speedCrouch: 2.4,
-      heightStand: 8.0, heightCrouch: 5.0,
-      pos: camera.position,
-      velocity: new THREE.Vector3(),
-      yaw: 0, pitch: 0,
-      isCrouch: false, isSprinting: false, isAiming:false,
-      stamina: 100, maxStamina:100, staminaRegen: 12, staminaDrainSprint: 20,
-      noise: 0, // current instantaneous noise level (0..1)
-      lastMoveTime: performance.now(),
-      grounded: true
-    };
-
-    // keyboard state
-    const keys = {};
-    window.addEventListener('keydown', (e)=>{ keys[e.code]=true; });
-    window.addEventListener('keyup', (e)=>{ keys[e.code]=false; });
-
-    // pointer lock mouse aim handled by PointerLockControls — we also track yaw/pitch for HUD compass
-    // Controls: map WASD to movement relative to camera direction
-    function updatePlayerMovement(delta){
-      const move = new THREE.Vector3();
-      const forward = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
-      const strafe = (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0);
-      player.isSprinting = keys['ShiftLeft'] || keys['ShiftRight'];
-      player.isCrouch = keys['ControlLeft'] || keys['ControlRight'];
-      // compute movement vector in camera space
-      const camDir = new THREE.Vector3();
-      camera.getWorldDirection(camDir);
-      camDir.y = 0; camDir.normalize();
-      const camRight = new THREE.Vector3();
-      camRight.crossVectors(new THREE.Vector3(0,1,0), camDir).normalize();
-
-      move.addScaledVector(camDir, forward);
-      move.addScaledVector(camRight, strafe);
-      if (move.lengthSq() > 0) move.normalize();
-
-      // choose speed
-      let speed = player.speedWalk;
-      if (player.isSprinting && !player.isCrouch) speed = player.speedSprint;
-      if (player.isCrouch) speed = player.speedCrouch;
-      move.multiplyScalar(speed * delta);
-
-      // apply to position with simple collision / terrain follow
-      const newPos = player.pos.clone().add(move);
-      // clamp to terrain bounds
-      const edge = GAME.terrainSize/2 - 10;
-      newPos.x = clamp(newPos.x, -edge, edge);
-      newPos.z = clamp(newPos.z, -edge, edge);
-      newPos.y = getTerrainHeightAt(newPos.x, newPos.z) + (player.isCrouch ? player.heightCrouch : player.heightStand);
-      camera.position.copy(newPos);
-
-      // stamina & noise
-      if (player.isSprinting && (forward !== 0 || strafe !== 0) && player.stamina > 0 && !player.isCrouch){
-        player.stamina -= player.staminaDrainSprint * delta;
-        player.stamina = Math.max(0, player.stamina);
-      } else {
-        player.stamina += player.staminaRegen * delta;
-        player.stamina = Math.min(player.maxStamina, player.stamina);
-      }
-
-      // noise multiplier: running > walking > crouching > aim
-      const movementSpeed = (Math.abs(forward) + Math.abs(strafe)) > 0 ? (player.isSprinting ? 1.0 : (player.isCrouch ? 0.15 : 0.4)) : 0.05;
-      player.noise = movementSpeed * (1 - (player.stamina/ player.maxStamina) * 0.5);
-    }
-
-    // -- Wind / scent --
-    const wind = {
-      dir: new THREE.Vector3(1,0,0).normalize(), // direction wind is blowing *towards*
-      speed: 4 + rng()*6,
-      timer: 0
-    };
-    function updateWind(delta){
-      wind.timer -= delta;
-      if (wind.timer <= 0){
-        wind.timer = 6 + rng()*14;
-        const a = rng()*Math.PI*2;
-        wind.dir.set(Math.cos(a),0,Math.sin(a)).normalize();
-        wind.speed = 2 + rng()*8;
-      }
-    }
-
-    // -- Animal class (simple) --
-    class Animal {
-      constructor(type, pos){
-        this.type = type; // 'deer' or 'boar'
-        this.pos = pos.clone();
-        this.state = 'idle'; // idle, grazing, alert, flee, dead
-        this.mesh = this.buildMesh();
-        this.mesh.position.copy(this.pos);
-        scene.add(this.mesh);
-
-        if (type === 'deer'){
-          this.speed = 6 + rng()*2; this.hearing = 0.8; this.vision = 120; this.maxHP = 70;
-        } else {
-          this.speed = 4 + rng()*2; this.hearing = 1.0; this.vision = 90; this.maxHP = 110;
-        }
-        this.hp = this.maxHP;
-        this.target = this.randomWanderTarget();
-        this.alertTimer = 0;
-        this.deadTimer = 0;
-      }
-      buildMesh(){
-        const g = new THREE.Group();
-        const bodyColor = (this.type==='deer') ? 0xc4a176 : 0x7b5e4a;
-        const body = new THREE.Mesh(new THREE.BoxGeometry(3.4,1.6,1.6), new THREE.MeshStandardMaterial({ color: bodyColor }));
-        body.position.set(0,1.2,0);
-        body.castShadow = true;
-        g.add(body);
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.8,0.8,1.1), new THREE.MeshStandardMaterial({ color: bodyColor }));
-        head.position.set(1.6,1.6,0);
-        head.castShadow = true;
-        g.add(head);
-        // simple legs
-        for(let i=-1;i<=1;i+=2){
-          for(let j=-1;j<=1;j+=2){
-            const leg = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.1,0.3), new THREE.MeshStandardMaterial({ color:0x2e1e12 }));
-            leg.position.set(0.8,0.2, j*0.55 + (i*0.2));
-            g.add(leg);
-          }
-        }
-        // small indicator for debug
-        return g;
-      }
-      randomWanderTarget(){
-        const range = 120;
-        return new THREE.Vector3(randRange(-range,range),0,randRange(-range,range));
-      }
-      update(delta){
-        if (this.state === 'dead'){
-          this.deadTimer += delta;
-          if (this.deadTimer > 30) {
-            // fade out
-            this.mesh.material && (this.mesh.material.opacity = Math.max(0, 1 - (this.deadTimer-30)/20));
-            this.mesh.traverse((m)=>{ if (m.material) { m.material.transparent = true; m.material.opacity = Math.max(0,1-(this.deadTimer-30)/20);} });
-          }
-          return;
-        }
-
-        // position sync
-        this.pos.copy(this.mesh.position);
-
-        // simple detection of player via hearing and vision
-        const vecToPlayer = new THREE.Vector3().subVectors(camera.position, this.pos);
-        const dist = vecToPlayer.length();
-        const dirToPlayer = vecToPlayer.clone().normalize();
-
-        // wind-scent factor: if wind is blowing FROM player TO animal (i.e., wind.dir dot player->animal > 0)
-        const playerToAnimal = new THREE.Vector3().subVectors(this.pos, camera.position).normalize();
-        const scentFactor = Math.max(0, playerToAnimal.dot(wind.dir)); // 0..1
-        // effective detection range depends on player's noise and scent factor
-        const playerNoise = player.noise; // 0..1
-        const detectRange = (this.vision) * (1 + this.hearing * playerNoise * 3 + scentFactor * 1.6);
-
-        // line-of-sight check (raycast against terrain only; trees could block too but we keep simple)
-        let hasLineOfSight = false;
-        if (dist < detectRange){
-          const r = new THREE.Raycaster(this.pos.clone().add(new THREE.Vector3(0,1.4,0)), dirToPlayer, 0, dist);
-          const hits = r.intersectObject(terrain, true);
-          // if the first hit is farther than the player, then it's visible (rare)
-          if (hits.length === 0) hasLineOfSight = true;
-          else {
-            // if hit distance is greater than distance to player -> player visible
-            if (hits[0].distance + 0.5 >= dist) hasLineOfSight = true;
-            else hasLineOfSight = false;
-          }
-        }
-
-        // hearing detection: sound can alert even without LOS if player made noise within range*hearing
-        const hearingThreshold = 60 + 160*this.hearing*playerNoise;
-        const heard = dist < hearingThreshold;
-
-        // become alert if seen or heard with some randomness
-        if ((hasLineOfSight && Math.random() < 0.9) || (heard && Math.random() < 0.5)){
-          this.state = 'alert';
-          this.alertTimer = 3 + rng()*3;
-        }
-
-        // state machine
-        if (this.state === 'idle' || this.state === 'grazing'){
-          // wander toward target
-          const target3 = this.target.clone();
-          target3.y = getTerrainHeightAt(target3.x, target3.z) + 1.2;
-          const move = new THREE.Vector3().subVectors(target3, this.pos);
-          const d = move.length();
-          if (d < 3){
-            // choose new target occasionally
-            if (Math.random() < 0.02) this.target = this.randomWanderTarget();
-            if (Math.random() < 0.004) this.state = 'grazing';
-          } else {
-            move.normalize();
-            this.mesh.position.addScaledVector(move, this.speed * delta * 0.5);
-            this.mesh.lookAt(target3.x, this.mesh.position.y, target3.z);
-            // place on terrain
-            const y = getTerrainHeightAt(this.mesh.position.x, this.mesh.position.z) + 1.2;
-            this.mesh.position.y = y;
-            this.state = 'idle';
-          }
-        } else if (this.state === 'alert'){
-          this.alertTimer -= delta;
-          // slowly face player and take a step back
-          const away = new THREE.Vector3().subVectors(this.mesh.position, camera.position).normalize();
-          this.mesh.position.addScaledVector(away, this.speed * delta * 0.6);
-          this.mesh.lookAt(camera.position.x, this.mesh.position.y, camera.position.z);
-          this.mesh.position.y = getTerrainHeightAt(this.mesh.position.x, this.mesh.position.z) + 1.2;
-          if (this.alertTimer <= 0){
-            this.state = 'flee';
-          }
-        } else if (this.state === 'flee'){
-          const away = new THREE.Vector3().subVectors(this.mesh.position, camera.position).normalize();
-          this.mesh.position.addScaledVector(away, this.speed * delta * (1.2 + Math.random()*0.8));
-          this.mesh.lookAt(camera.position.x, this.mesh.position.y, camera.position.z);
-          this.mesh.position.y = getTerrainHeightAt(this.mesh.position.x, this.mesh.position.z) + 1.2;
-          // after running a bit, return to wander
-          if (Math.random() < 0.005) this.state = 'idle';
-        }
-
-        // hit animation handled in takeDamage
-      }
-      takeDamage(dmg, hitPoint){
-        this.hp -= dmg;
-        this.state = 'alert';
-        this.alertTimer = 1.2;
-        // small red flash effect
-        const flash = new THREE.PointLight(0xffa0a0, 0.8, 20, 1);
-        flash.position.copy(this.mesh.position).add(new THREE.Vector3(0,2,0));
-        scene.add(flash);
-        setTimeout(()=> scene.remove(flash), 120);
-
-        if (this.hp <= 0){
-          this.die(hitPoint);
-        }
-      }
-      die(point){
-        this.state = 'dead';
-        // simple collapse: rotate on side
-        this.mesh.rotation.z = Math.PI*0.5;
-        this.deadTimer = 0;
-        // drop to ground slightly
-        this.mesh.position.y = getTerrainHeightAt(this.mesh.position.x, this.mesh.position.z) + 0.6;
-      }
-    }
-
-    // create animals
-    const animals = [];
-    for(let i=0;i<GAME.animalCount;i++){
-      const t = (Math.random() < 0.7) ? 'deer' : 'boar';
-      let x,z, y;
-      do {
-        x = randRange(-GAME.terrainSize/2 + 30, GAME.terrainSize/2 - 30);
-        z = randRange(-GAME.terrainSize/2 + 30, GAME.terrainSize/2 - 30);
-        y = getTerrainHeightAt(x, z);
-      } while (y < -4 || Math.hypot(x,z) < 40);
-      const a = new Animal(t, new THREE.Vector3(x, y+1.2, z));
-      animals.push(a);
-    }
-
-    // scene boundary markers (optional)
-    const borderMat = new THREE.LineBasicMaterial({ color:0x8fa9a0 });
-    const borderGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-GAME.terrainSize/2, 0, -GAME.terrainSize/2),
-      new THREE.Vector3(GAME.terrainSize/2, 0, -GAME.terrainSize/2),
-      new THREE.Vector3(GAME.terrainSize/2, 0, GAME.terrainSize/2),
-      new THREE.Vector3(-GAME.terrainSize/2, 0, GAME.terrainSize/2),
-      new THREE.Vector3(-GAME.terrainSize/2, 0, -GAME.terrainSize/2),
-    ]);
-    const borderLine = new THREE.Line(borderGeo, borderMat);
-    scene.add(borderLine);
-
-    // -- Weapon system (Rifle = hitscan, Bow = projectile) --
-    const weapons = {
-      rifle: {
-        name:'Rifle',
-        ammo: 10, clip:10, maxClip:10, reserve:90,
-        damage: 60, range: 500, fireRate: 0.25, lastFire: -999,
-        spread: 0.006, reloadTime: 1.8
-      },
-      bow: {
-        name:'Bow',
-        arrows: 8, maxArrows: 24, drawTime: 1.0, arrowDamage: 40,
-      }
-    };
-    let currentWeapon = 'rifle';
-    let isReloading = false;
-    let reloadTimer = 0;
-
-    // UI elements
-    const ammoInfo = document.getElementById('ammoInfo');
-    const weaponInfo = document.getElementById('weaponInfo');
-    const hudWeapon = document.getElementById('hudWeapon');
-    const staminaInfo = document.getElementById('staminaInfo');
-    const windInfo = document.getElementById('windInfo');
-    const timeOfDayLabel = document.getElementById('timeOfDay');
-    const compassEl = document.getElementById('compass');
-    const windArrow = document.getElementById('windArrow');
-
-    function updateHUD(){
-      if (currentWeapon === 'rifle'){
-        ammoInfo.textContent = `Rifle: ${weapons.rifle.clip} / ${weapons.rifle.reserve}`;
-        hudWeapon.textContent = `Rifle • ${weapons.rifle.clip} / ${weapons.rifle.reserve}`;
-        weaponInfo.textContent = 'Weapon: Rifle';
-      } else {
-        ammoInfo.textContent = `Bow: ${weapons.bow.arrows} arrows`;
-        hudWeapon.textContent = `Bow • ${weapons.bow.arrows}`;
-        weaponInfo.textContent = 'Weapon: Bow';
-      }
-      staminaInfo.textContent = `Stamina: ${Math.round(player.stamina)}%`;
-      // show wind direction
-      const dir = wind.dir.clone().negate(); // show arrow pointing where scent goes
-      const angleDeg = Math.atan2(dir.x, dir.z) * 180/Math.PI;
-      const cardinal = angleToCardinal(angleDeg);
-      windInfo.textContent = `Wind: ${cardinal} • ${Math.round(wind.speed)}m/s`;
-      windArrow.textContent = '➤';
-      windArrow.style.transform = `rotate(${angleDeg}deg)`;
-    }
-
-    function angleToCardinal(deg){
-      // deg: -180..180 where 0 = north? Our angle computed has 0 = +z
-      const a = (deg + 360) % 360;
-      if (a < 22.5 || a >= 337.5) return 'N';
-      if (a < 67.5) return 'NE';
-      if (a < 112.5) return 'E';
-      if (a < 157.5) return 'SE';
-      if (a < 202.5) return 'S';
-      if (a < 247.5) return 'SW';
-      if (a < 292.5) return 'W';
-      return 'NW';
-    }
-
-    // shooting helpers
-    function fireRifle(){
-      const now = performance.now()/1000;
-      if (isReloading) return;
-      if (now - weapons.rifle.lastFire < weapons.rifle.fireRate) return;
-      if (weapons.rifle.clip <= 0){
-        playReload();
-        return;
-      }
-      weapons.rifle.lastFire = now;
-      weapons.rifle.clip--;
-      player.noise = Math.max(player.noise, 1.0); // loud
-      // muzzle flash
-      const muzzle = new THREE.PointLight(0xfff1dd, 2.2, 60);
-      const camPos = new THREE.Vector3().copy(camera.position);
-      muzzle.position.copy(camPos).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(3));
-      scene.add(muzzle);
-      setTimeout(()=> scene.remove(muzzle), 80);
-
-      // hitscan raycast
-      const origin = camera.position.clone();
-      const dir = camera.getWorldDirection(new THREE.Vector3());
-      // add spread
-      const spread = weapons.rifle.spread * (player.isAiming ? 0.3 : 1.0);
-      dir.x += (Math.random()*2-1)*spread;
-      dir.y += (Math.random()*2-1)*spread;
-      dir.z += (Math.random()*2-1)*spread;
-      dir.normalize();
-      const ray = new THREE.Raycaster(origin, dir, 0, weapons.rifle.range);
-      // check animals
-      const hits = [];
-      animals.forEach(a => {
-        // approximate with distance to animal center
-        const toA = new THREE.Vector3().subVectors(a.mesh.position, origin);
-        const proj = toA.dot(dir);
-        if (proj > 0 && proj < weapons.rifle.range){
-          const closest = new THREE.Vector3().addVectors(origin, dir.clone().multiplyScalar(proj));
-          const d = closest.distanceTo(a.mesh.position);
-          if (d < 2.2){ hits.push({animal:a, dist:proj}); }
-        }
-      });
-      if (hits.length > 0){
-        hits.sort((a,b)=>a.dist-b.dist);
-        const victim = hits[0].animal;
-        victim.takeDamage(weapons.rifle.damage);
-        // blood/impact (tiny red particle)
-        const p = new THREE.Mesh(new THREE.SphereGeometry(0.12,6,6), new THREE.MeshBasicMaterial({ color:0xff3b3b }));
-        p.position.copy(victim.mesh.position).add(new THREE.Vector3(0,1.4,0));
-        scene.add(p);
-        setTimeout(()=> scene.remove(p), 1200);
-      } else {
-        // bullet tracer line
-        const lineGeo = new THREE.BufferGeometry().setFromPoints([
-          origin,
-          origin.clone().add(dir.clone().multiplyScalar(weapons.rifle.range))
-        ]);
-        const lineMat = new THREE.LineBasicMaterial({ color:0xffffbb });
-        const line = new THREE.Line(lineGeo, lineMat);
-        scene.add(line);
-        setTimeout(()=> scene.remove(line), 70);
-      }
-      // play gun sound (synth)
-      playGunshot();
-      updateHUD();
-    }
-
-    function reloadRifle(){
-      if (isReloading) return;
-      const clip = weapons.rifle.clip;
-      const reserve = weapons.rifle.reserve;
-      if (clip >= weapons.rifle.maxClip || reserve <= 0) return;
-      isReloading = true;
-      reloadTimer = weapons.rifle.reloadTime;
-      // small reload sound
-      playReload();
-    }
-
-    function finishReload(){
-      const needed = weapons.rifle.maxClip - weapons.rifle.clip;
-      const take = Math.min(needed, weapons.rifle.reserve);
-      weapons.rifle.clip += take;
-      weapons.rifle.reserve -= take;
-      isReloading = false;
-      updateHUD();
-    }
-
-    // Bow firing (charge & release)
-    let bowChargeStart = 0;
-    function startBowDraw(){
-      bowChargeStart = performance.now()/1000;
-    }
-    function releaseBow(){
-      const now = performance.now()/1000;
-      const held = clamp((now - bowChargeStart)/weapons.bow.drawTime, 0, 1);
-      if (weapons.bow.arrows <= 0) return;
-      weapons.bow.arrows--;
-      player.noise = Math.max(player.noise, 0.35); // quieter
-      // spawn an arrow
-      const origin = camera.position.clone();
-      const dir = camera.getWorldDirection(new THREE.Vector3());
-      const speed = 90 * (0.6 + 0.8*held);
-      const arrow = {
-        pos: origin.clone(),
-        vel: dir.clone().multiplyScalar(speed),
-        life: 6,
-        mesh: createArrowMesh()
-      };
-      arrow.mesh.position.copy(arrow.pos);
-      scene.add(arrow.mesh);
-      arrows.push(arrow);
-      playBowSound();
-      updateHUD();
-    }
-
-    function createArrowMesh(){
-      const g = new THREE.CylinderGeometry(0.03,0.03,2.0,6);
-      g.rotateZ(Math.PI/2);
-      const mat = new THREE.MeshStandardMaterial({ color:0x5a3d2a });
-      const m = new THREE.Mesh(g, mat);
-      m.castShadow = true;
-      return m;
-    }
-
-    // arrows flight
-    const arrows = [];
-
-    // audio synths (WebAudio)
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playGunshot(){
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = 'square';
-      o.frequency.value = 800;
-      g.gain.value = 0.0001;
-      o.connect(g); g.connect(audioCtx.destination);
-      g.gain.exponentialRampToValueAtTime(0.6, audioCtx.currentTime + 0.001);
-      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-      o.start(); o.stop(audioCtx.currentTime + 0.26);
-    }
-    function playBowSound(){
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = 'sine';
-      o.frequency.value = 520;
-      g.gain.value = 0.0001;
-      o.connect(g); g.connect(audioCtx.destination);
-      g.gain.exponentialRampToValueAtTime(0.3, audioCtx.currentTime + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.9);
-      o.start(); o.stop(audioCtx.currentTime + 0.95);
-    }
-    function playReload(){
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = 'triangle';
-      o.frequency.value = 160;
-      g.gain.value = 0.0001;
-      o.connect(g); g.connect(audioCtx.destination);
-      g.gain.exponentialRampToValueAtTime(0.05, audioCtx.currentTime + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.45);
-      o.start(); o.stop(audioCtx.currentTime + 0.48);
-    }
-
-    // Input mouse buttons
-    let mouseDown = false;
-    window.addEventListener('mousedown', (e) => {
-      if (!controls.isLocked) return;
-      if (e.button === 0) { // left fire
-        mouseDown = true;
-        if (currentWeapon === 'rifle') {
-          fireRifle();
-        } else {
-          startBowDraw();
-        }
-      }
-      if (e.button === 2) { // right aim
-        player.isAiming = true;
+      // Raycast
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera({x:0,y:0}, camera);
+      const hits = raycaster.intersectObject(deer);
+      if(hits.length>0){
+        deer.material.color.set(0xff0000); // hit!
+        setTimeout(()=>scene.remove(deer),500);
       }
     });
-    window.addEventListener('mouseup', (e) => {
-      if (!controls.isLocked) return;
-      if (e.button === 0) {
-        mouseDown = false;
-        if (currentWeapon === 'bow') { releaseBow(); }
-      }
-      if (e.button === 2) {
-        player.isAiming = false;
+
+    // Movement controls (WASD + mouse look)
+    let keys = {};
+    document.addEventListener("keydown", e=> keys[e.code]=true);
+    document.addEventListener("keyup", e=> keys[e.code]=false);
+
+    let pitch = 0, yaw = 0;
+    document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock;
+    document.body.onclick = ()=>document.body.requestPointerLock();
+    document.addEventListener("mousemove", e=>{
+      if(document.pointerLockElement===document.body){
+        yaw -= e.movementX*0.002;
+        pitch -= e.movementY*0.002;
+        pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
       }
     });
-    // weapon switch and reload keys
-    window.addEventListener('keydown', (e) => {
-      if (!controls.isLocked) return;
-      if (e.code === 'KeyR') { reloadRifle(); }
-      if (e.code === 'Digit1') { currentWeapon = 'rifle'; updateHUD(); }
-      if (e.code === 'Digit2') { currentWeapon = 'bow'; updateHUD(); }
-      // quick fire while holding rifle (auto) — allow holding
-      if (e.code === 'KeyF'){ /* reserved */ }
-    });
 
-    // allow holding LMB for automatic rifle fire
-    setInterval(()=>{
-      if (mouseDown && currentWeapon === 'rifle' && controls.isLocked) {
-        fireRifle();
-      }
-    }, 120);
-
-    // -- Minimap rendering (simple 2D) --
-    const minimap = document.getElementById('minimap');
-    const mmCtx = minimap.getContext('2d');
-    function drawMinimap(){
-      const w = minimap.width, h = minimap.height;
-      mmCtx.clearRect(0,0,w,h);
-      // background
-      mmCtx.fillStyle = '#081215';
-      mmCtx.fillRect(0,0,w,h);
-      // center = player position
-      const scale = 0.12; // world meters to pixels
-      const cx = w/2, cy = h/2;
-      // draw animals
-      animals.forEach(a=>{
-        const dx = (a.mesh.position.x - camera.position.x) * scale;
-        const dz = (a.mesh.position.z - camera.position.z) * scale;
-        const px = cx + dx; const py = cy + dz;
-        mmCtx.fillStyle = a.state === 'dead' ? '#888' : (a.type==='deer' ? '#ffd37a' : '#e2b8a2');
-        mmCtx.beginPath(); mmCtx.arc(px,py,4,0,Math.PI*2); mmCtx.fill();
-      });
-      // draw player arrow oriented with camera yaw
-      mmCtx.save();
-      mmCtx.translate(cx,cy);
-      const dir = camera.getWorldDirection(new THREE.Vector3());
-      const angle = Math.atan2(dir.x, dir.z);
-      mmCtx.rotate(angle);
-      mmCtx.fillStyle = '#a7e7ff';
-      mmCtx.beginPath(); mmCtx.moveTo(0,-8); mmCtx.lineTo(6,6); mmCtx.lineTo(-6,6); mmCtx.closePath(); mmCtx.fill();
-      mmCtx.restore();
-    }
-
-    // -- Rain particle system (weather) --
-    const rain = { particles: [], active:false, spawnTimer:0 };
-    function updateRain(delta){
-      if (!rain.active) {
-        // small chance to start
-        if (rng() < 0.0006) rain.active = true;
-        return;
-      }
-      rain.spawnTimer -= delta;
-      if (rain.spawnTimer <= 0){
-        rain.spawnTimer = 0.01;
-        const p = {
-          pos: new THREE.Vector3(randRange(camera.position.x-200,camera.position.x+200), camera.position.y+randRange(80,200), randRange(camera.position.z-200,camera.position.z+200)),
-          vel: new THREE.Vector3(0, -randRange(80,160), 0),
-          life: 3
-        };
-        rain.particles.push(p);
-      }
-      // update
-      for(let i=rain.particles.length-1;i>=0;i--){
-        const p = rain.particles[i];
-        p.pos.addScaledVector(p.vel, delta);
-        p.life -= delta;
-        if (p.pos.y < getTerrainHeightAt(p.pos.x, p.pos.z)+0.5 || p.life <= 0) rain.particles.splice(i,1);
-      }
-      // small chance to stop
-      if (rng() < 0.0003) rain.active = false;
-    }
-
-    // tiny visual for rain: we will render as lines directly in overlay canvas (fast)
-    function drawRainOverlay(){
-      // skip if none
-      if (!rain.active) return;
-      // create tiny overlay canvas if not created
-    }
-
-    // -- Main loop and timing --
-    const clock = new THREE.Clock();
-    let timeOfDay = 0.12; // 0..1
     function animate(){
-      const delta = clock.getDelta();
-      // update time
-      timeOfDay += delta / GAME.dayLengthSec;
-      timeOfDay %= 1.0;
-      updateLighting(timeOfDay);
-      // update wind
-      updateWind(delta);
-      // update player
-      updatePlayerMovement(delta);
-      // update animals
-      animals.forEach(a => a.update(delta));
-      // update arrows
-      for(let i=arrows.length-1;i>=0;i--){
-        const ar = arrows[i];
-        // integrate
-        ar.vel.y -= 9.8 * delta; // gravity
-        const prev = ar.pos.clone();
-        ar.pos.addScaledVector(ar.vel, delta);
-        // rotate mesh to velocity
-        ar.mesh.position.copy(ar.pos);
-        const velDir = ar.vel.clone().normalize();
-        ar.mesh.lookAt(ar.pos.clone().add(velDir));
-        // detect hit with animals by simple sphere checks along the segment
-        let hit = false;
-        animals.forEach(a=>{
-          if (a.state === 'dead') return;
-          const closest = closestPointOnSegment(a.mesh.position, prev, ar.pos);
-          const dist = closest.distanceTo(a.mesh.position);
-          if (dist < 1.6){
-            // hit
-            a.takeDamage(weapons.bow.arrowDamage, closest);
-            hit = true;
-          }
-        });
-        // remove if hit or life expired
-        ar.life -= delta;
-        if (hit || ar.life <= 0){
-          scene.remove(ar.mesh);
-          arrows.splice(i,1);
-        }
-      }
-      // reload handling
-      if (isReloading){
-        reloadTimer -= delta;
-        if (reloadTimer <= 0) finishReload();
-      }
-
-      // rain
-      updateRain(delta);
-
-      // HUD & minimap updates
-      updateHUD();
-      drawMinimap();
-
-      // update camera fog distance based on day/night
-      renderer.render(scene, camera);
       requestAnimationFrame(animate);
+
+      // Move
+      const speed = 0.1;
+      const forward = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+      const right = new THREE.Vector3(forward.z,0,-forward.x);
+      if(keys["KeyW"]) camera.position.addScaledVector(forward,-speed);
+      if(keys["KeyS"]) camera.position.addScaledVector(forward,speed);
+      if(keys["KeyA"]) camera.position.addScaledVector(right,-speed);
+      if(keys["KeyD"]) camera.position.addScaledVector(right,speed);
+
+      camera.rotation.set(pitch,yaw,0);
+      renderer.render(scene,camera);
     }
     animate();
 
-    // helper: closest point on line segment
-    function closestPointOnSegment(point, a, b){
-      const ab = new THREE.Vector3().subVectors(b,a);
-      const t = clamp(new THREE.Vector3().subVectors(point,a).dot(ab) / ab.lengthSq(), 0, 1);
-      return a.clone().add(ab.multiplyScalar(t));
-    }
-
-    // basic utility: point-to-plane ray intersection for player clicks (not used beyond)
-    function worldPosFromScreen(x,y){
-      const ndc = new THREE.Vector2((x/innerWidth)*2-1, -(y/innerHeight)*2+1);
-      const ray = new THREE.Raycaster();
-      ray.setFromCamera(ndc, camera);
-      const hits = ray.intersectObject(terrain);
-      if (hits.length) return hits[0].point;
-      return null;
-    }
-
-    // keyboard & gamepad extras handled above
-
-    // debug: show camera heading
-    setInterval(()=>{
-      const d = camera.getWorldDirection(new THREE.Vector3());
-      const angle = Math.atan2(d.x, d.z) * 180/Math.PI;
-      const card = angleToCardinal(angle);
-      compassEl.textContent = card;
-      timeOfDayLabel.textContent = (timeOfDay < 0.45 || timeOfDay > 0.95) ? 'Night' : 'Day';
-    }, 200);
-
-    // simple UI: pointer lock starts audio context on first click (resume)
-    document.addEventListener('click', ()=> {
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+    window.addEventListener("resize", ()=>{
+      camera.aspect=window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth,window.innerHeight);
     });
-
-    // helper to keep HUD updated frequently
-    setInterval(updateHUD, 500);
-
-    // small safety: prevent context menu on right click (for aiming)
-    window.addEventListener('contextmenu', (e)=> {
-      e.preventDefault();
-    });
-
-    // Helper exposed to debug in console
-    window.__game = { animals, player, scene };
-
+  }
   </script>
 </body>
 </html>
