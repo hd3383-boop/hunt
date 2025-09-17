@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Wild Hunt – First Person</title>
+  <title>Wild Hunt Simulator</title>
   <style>
     body { margin:0; overflow:hidden; background:#222; }
     canvas { display:block; }
@@ -25,24 +25,33 @@
       padding: 8px 12px;
       border-radius: 8px;
     }
+    #message {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: yellow;
+      font-size: 32px;
+      font-family: sans-serif;
+      background: rgba(0,0,0,0.6);
+      padding: 20px 30px;
+      border-radius: 12px;
+      display: none;
+    }
   </style>
 </head>
 <body>
   <div id="crosshair"></div>
-  <div id="hud">Ammo: <span id="ammo">5</span></div>
+  <div id="hud">
+    Ammo: <span id="ammo">5</span> | 
+    Score: <span id="score">0</span>
+  </div>
+  <div id="message"></div>
+
+  <!-- Three.js from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 
   <script>
-  // -------- Minimal Three.js Build ---------
-  // Lightweight build (core + basics) from https://unpkg.com/three/build/three.min.js
-  // For offline use, you’d normally paste the full lib here. To keep file size readable,
-  // I’m using an inline fetch trick:
-  const script = document.createElement('script');
-  script.src = "https://unpkg.com/three/build/three.min.js";
-  script.onload = init;
-  document.head.appendChild(script);
-
   function init(){
-    // Basic setup
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
 
@@ -54,13 +63,13 @@
     document.body.appendChild(renderer.domElement);
 
     // Ground
-    const groundGeo = new THREE.PlaneGeometry(100,100);
+    const groundGeo = new THREE.PlaneGeometry(200,200);
     const groundMat = new THREE.MeshLambertMaterial({color:0x228B22});
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI/2;
     scene.add(ground);
 
-    // Light
+    // Lights
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
     hemiLight.position.set(0,20,0);
     scene.add(hemiLight);
@@ -69,32 +78,64 @@
     dirLight.position.set(-3,10,-10);
     scene.add(dirLight);
 
-    // Simple "animal"
-    const deerGeo = new THREE.BoxGeometry(1,1,2);
-    const deerMat = new THREE.MeshLambertMaterial({color:0x8B4513});
-    const deer = new THREE.Mesh(deerGeo, deerMat);
-    deer.position.set(0,0.5,-10);
-    scene.add(deer);
-
-    // Ammo + shooting
-    let ammo = 5;
+    // HUD elements
     const ammoDisplay = document.getElementById("ammo");
+    const scoreDisplay = document.getElementById("score");
+    const messageBox = document.getElementById("message");
+
+    let ammo = 5;
+    let maxAmmo = 5;
+    let score = 0;
+
+    // Animal spawning
+    const animals = [];
+    const animalTypes = [
+      {name:"Deer", color:0x8B4513, size:[1,1,2], score:50},
+      {name:"Boar", color:0x555555, size:[1.2,1,1.5], score:30},
+      {name:"Rabbit", color:0xffffff, size:[0.5,0.5,0.5], score:10}
+    ];
+
+    function spawnAnimal(){
+      const type = animalTypes[Math.floor(Math.random()*animalTypes.length)];
+      const geo = new THREE.BoxGeometry(...type.size);
+      const mat = new THREE.MeshLambertMaterial({color:type.color});
+      const mesh = new THREE.Mesh(geo,mat);
+      mesh.position.set((Math.random()-0.5)*80, type.size[1]/2, (Math.random()-0.5)*80);
+      mesh.userData = {type:type, direction:Math.random()*Math.PI*2};
+      animals.push(mesh);
+      scene.add(mesh);
+    }
+
+    // Spawn some animals at start
+    for(let i=0;i<10;i++) spawnAnimal();
+
+    // Shooting
     window.addEventListener("click", ()=>{
-      if(ammo<=0) return;
+      if(ammo<=0){ return; }
       ammo--;
       ammoDisplay.textContent = ammo;
 
-      // Raycast
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera({x:0,y:0}, camera);
-      const hits = raycaster.intersectObject(deer);
+      const hits = raycaster.intersectObjects(animals);
       if(hits.length>0){
-        deer.material.color.set(0xff0000); // hit!
-        setTimeout(()=>scene.remove(deer),500);
+        const target = hits[0].object;
+        score += target.userData.type.score;
+        scoreDisplay.textContent = score;
+        scene.remove(target);
+        animals.splice(animals.indexOf(target),1);
       }
     });
 
-    // Movement controls (WASD + mouse look)
+    // Reload
+    window.addEventListener("keydown", e=>{
+      if(e.code==="KeyR"){
+        ammo = maxAmmo;
+        ammoDisplay.textContent = ammo;
+      }
+    });
+
+    // Movement
     let keys = {};
     document.addEventListener("keydown", e=> keys[e.code]=true);
     document.addEventListener("keyup", e=> keys[e.code]=false);
@@ -110,11 +151,12 @@
       }
     });
 
+    // Main loop
     function animate(){
       requestAnimationFrame(animate);
 
-      // Move
-      const speed = 0.1;
+      // Player movement
+      const speed = 0.15;
       const forward = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
       const right = new THREE.Vector3(forward.z,0,-forward.x);
       if(keys["KeyW"]) camera.position.addScaledVector(forward,-speed);
@@ -123,6 +165,14 @@
       if(keys["KeyD"]) camera.position.addScaledVector(right,speed);
 
       camera.rotation.set(pitch,yaw,0);
+
+      // Animal wandering AI
+      animals.forEach(a=>{
+        a.position.x += Math.cos(a.userData.direction)*0.02;
+        a.position.z += Math.sin(a.userData.direction)*0.02;
+        if(Math.random()<0.01) a.userData.direction += (Math.random()-0.5);
+      });
+
       renderer.render(scene,camera);
     }
     animate();
@@ -133,6 +183,8 @@
       renderer.setSize(window.innerWidth,window.innerHeight);
     });
   }
+
+  init();
   </script>
 </body>
 </html>
