@@ -3,249 +3,216 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Open World Ultra Fishing — Single File</title>
+<title>Mega Open-World Hunt + Fish — Single File</title>
 <style>
-  :root{--panel:rgba(6,10,20,0.72);--accent:#6fe8ff;--muted:#bcd9f8}
-  html,body{height:100%;margin:0;background:#071226;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#e6f6ff;overflow:hidden}
+  :root{--panel:rgba(6,10,20,0.78);--accent:#6fe8ff}
+  html,body{height:100%;margin:0;background:#071226;color:#eaf6ff;font-family:Inter,system-ui,Arial,Helvetica,sans-serif;overflow:hidden}
   #game{width:100vw;height:100vh;position:relative}
   canvas{display:block}
 
-  /* HUD panels */
-  .hud { position:absolute; z-index:60; pointer-events:none; }
-  #topLeft { left:12px; top:12px; }
-  #topRight { right:12px; top:12px; text-align:right; }
-  #bottomLeft { left:12px; bottom:12px; }
-  #bottomRight { right:12px; bottom:12px; }
+  /* HUD */
+  .hud{position:absolute;z-index:60;pointer-events:none}
+  #topLeft{left:12px;top:12px}
+  #topRight{right:12px;top:12px;text-align:right}
+  #bottomLeft{left:12px;bottom:12px}
+  #bottomRight{right:12px;bottom:12px}
+  .panel{background:var(--panel);padding:10px 12px;border-radius:12px;font-size:13px;min-width:240px;box-shadow:0 6px 30px rgba(0,0,0,0.6)}
+  .label{color:var(--accent);font-weight:700}
+  #crosshair{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;pointer-events:none;z-index:70}
+  #crosshair:before,#crosshair:after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2px;height:12px;background:rgba(255,255,255,0.9)}
+  #crosshair:before{transform:translate(-50%,-50%) rotate(90deg)}
+  .meter{height:10px;background:rgba(255,255,255,0.08);border-radius:6px;overflow:hidden;margin-top:6px}
+  .meter>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#2fa8ff);width:50%}
 
-  .panel { background:var(--panel); padding:10px 12px; border-radius:10px; font-size:13px; min-width:220px; box-shadow:0 6px 22px rgba(0,0,0,0.6) }
-  .label{ font-weight:700; color:var(--accent) }
-
-  #crosshair { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:20px; height:20px; pointer-events:none; z-index:70; }
-  #crosshair:before,#crosshair:after{ content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:2px; height:14px; background:rgba(255,255,255,0.9)}
-  #crosshair:before{ transform:translate(-50%,-50%) rotate(90deg) }
-
-  /* bars */
-  .meter{height:10px;background:rgba(255,255,255,0.08);border-radius:8px;overflow:hidden;margin-top:6px}
-  .meter > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#2fa8ff);width:50%}
-
-  #minimap{width:160px;height:160px;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.06));border:1px solid rgba(255,255,255,0.04)}
-  #controls { font-size:13px; color:var(--muted) }
-
-  #message { position:absolute; left:50%; top:22%; transform:translateX(-50%); z-index:80; pointer-events:none; display:none; padding:14px 18px; background:rgba(0,0,0,0.6); border-radius:10px; font-size:18px }
-
-  /* small help */
-  .help { max-width:420px; font-size:13px; color:#cfe8ff; line-height:1.3; }
-
-  @media (max-width:720px){
-    .panel{ min-width:160px; font-size:12px }
-    #minimap{ width:120px; height:120px }
-  }
+  #controls{font-size:13px;color:#cde8ff}
+  #message{position:absolute;left:50%;top:22%;transform:translateX(-50%);z-index:80;display:none;padding:12px 16px;background:rgba(0,0,0,0.7);border-radius:10px;font-size:17px}
+  #minimap{width:160px;height:160px;border-radius:8px;background:rgba(0,0,0,0.06);border:1px solid rgba(255,255,255,0.04)}
+  @media(max-width:720px){.panel{min-width:160px;font-size:12px}#minimap{width:120px;height:120px}}
 </style>
 </head>
 <body>
 <div id="game"></div>
 
 <!-- HUD -->
-<div class="hud" id="topLeft" style="pointer-events:none">
-  <div class="panel">
-    <div><span class="label">Ultra Fishing</span> • <span id="modeLabel">On-Foot</span></div>
-    <div style="margin-top:6px">Biome: <b id="biomeLabel">Lake</b> • Time: <b id="timeLabel">Day</b></div>
-    <div style="margin-top:6px">Health: <span id="healthLabel">100</span> • Stamina: <span id="staminaLabel">100</span></div>
-    <div style="margin-top:6px">Tackle: <span id="tackleLabel">Standard Lure</span> • Bait: <span id="baitLabel">Worms</span></div>
-    <div class="meter"><i id="staminaBar" style="width:100%"></i></div>
-  </div>
-</div>
+<div class="hud" id="topLeft"><div class="panel">
+  <div><span class="label">Mega World</span> • Mode: <span id="mode">Explore</span></div>
+  <div style="margin-top:6px">Biome: <b id="biome">Lake</b> • Time: <b id="timeOfDay">Day</b></div>
+  <div style="margin-top:6px">Health: <span id="health">100</span> • Stamina: <span id="stamina">100</span></div>
+  <div style="margin-top:6px">Weapon: <span id="weapon">None</span> • Rod: <span id="rod">Basic</span></div>
+  <div class="meter"><i id="staminaBar" style="width:100%"></i></div>
+</div></div>
 
-<div class="hud" id="topRight">
-  <div class="panel">
-    <div>Score: <b id="scoreLabel">0</b></div>
-    <div style="margin-top:8px">Line: <span id="lineLabel">Medium</span> • Lures left: <span id="lureCount">5</span></div>
-    <div style="margin-top:8px">High Score: <span id="highScore">0</span></div>
-  </div>
-</div>
+<div class="hud" id="topRight"><div class="panel">
+  <div>Score: <b id="score">0</b></div>
+  <div style="margin-top:8px">High Score: <b id="highScore">0</b></div>
+  <div style="margin-top:8px">Lures: <span id="lures">5</span> • Ammo: <span id="ammo">10</span></div>
+</div></div>
 
-<div class="hud" id="bottomLeft">
-  <div class="panel help" id="controls">Click to lock pointer • WASD move • Mouse look • Hold LMB to charge cast, release to cast • When fish bites: LMB to attempt reel • R cycle lure • B board/unboard boat • C change camera • M toggle minimap • H help</div>
-</div>
+<div class="hud" id="bottomLeft"><div class="panel" id="controls">
+  Controls: Click to lock pointer • WASD move • Mouse look • Shift sprint • Space jump <br>
+  Left Click: Fire / Cast / Interact • Hold LMB to charge cast • R: switch rod/lure • B: board/leave boat • C: camera • M: toggle minimap
+</div></div>
 
-<div class="hud" id="bottomRight">
-  <div class="panel">
-    <canvas id="minimap"></canvas>
-    <div style="margin-top:8px; text-align:center; color:#bcd9f8; font-size:12px">Minimap</div>
-  </div>
-</div>
+<div class="hud" id="bottomRight"><div class="panel" style="display:flex;flex-direction:column;align-items:center;gap:8px">
+  <canvas id="minimap"></canvas>
+  <div style="font-size:12px;color:#cde8ff">Minimap</div>
+</div></div>
 
 <div id="crosshair"></div>
 <div id="message"></div>
 
-<!-- Three.js (CDN friendly for GitHub Pages) -->
+<!-- Three.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 
 <script>
-/*  =============================================================================
-    Ultra Fishing — Single File
-    - Multiple biomes (lake, river, marsh, ocean)
-    - Fish species with rarity & biome/time/weather preferences
-    - Boat with boarding/steering
-    - Cast physics + bobber + bite system
-    - Reeling mini-game (tension bar and button mashing / hold)
-    - Day/night cycle, weather (wind & rain)
-    - Minimap, HUD, sounds (WebAudio), localStorage high score
-    - All in one file — drop into GitHub Pages
-    ============================================================================= */
+/* -------------------------------------------
+   Mega Open-World Hunt + Fish — Single File
+   - Combined hunting & fishing gameplay
+   - Max detail, but optimized for MacBook Air
+   - Single-file, GitHub Pages compatible
+   ------------------------------------------- */
 
-///////////////////////
-// Constants & Helpers
-///////////////////////
-const WORLD = { size: 1200, waterLevel: -1.5 };
-const BIOMES = ['Lake','River','Marsh','Ocean'];
+/* -------------------------
+   Config & Helpers
+   ------------------------- */
+const CONFIG = {
+  worldSize: 1200,
+  waterLevel: -1.5,
+  maxAnimals: 28,      // tuned for performance
+  maxFish: 130,
+  dayLengthSec: 300,
+  detailScale: 1.0     // set lower for weaker machines
+};
 function rand(a,b){return a + Math.random()*(b-a)}
-function pick(arr){return arr[Math.floor(Math.random()*arr.length)]}
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)]}
 function format(n){return Math.round(n*100)/100}
 
-///////////////////////
-// WebAudio feedback
-///////////////////////
-const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-function beep(freq=440, dur=0.12, vol=0.06){
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  o.type='sine'; o.frequency.value = freq;
-  g.gain.value = vol;
+/* -------------------------
+   Audio (WebAudio small cues)
+   ------------------------- */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function sfx(freq=440,dur=0.08,vol=0.04,type='sine'){
+  const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq; g.gain.value = vol;
   o.connect(g); g.connect(audioCtx.destination);
   o.start(); o.stop(audioCtx.currentTime + dur);
   g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
 }
 
-///////////////////////
-// Scene & Renderer
-///////////////////////
+/* -------------------------
+   Scene & Renderer
+   ------------------------- */
 const container = document.getElementById('game');
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x92bfff, 0.0006);
+scene.fog = new THREE.FogExp2(0x90b8ff, 0.00055);
 
-const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 3000);
-camera.position.set(0,6,18);
+const camera = new THREE.PerspectiveCamera(68, innerWidth/innerHeight, 0.1, 4000);
+camera.up.set(0,1,0);
 
-const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth,innerHeight);
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 container.appendChild(renderer.domElement);
 
-// lights
-const ambient = new THREE.AmbientLight(0x89b9ff, 0.35);
+/* Lights */
+const ambient = new THREE.AmbientLight(0x89b9ff, 0.4);
 scene.add(ambient);
-const sun = new THREE.DirectionalLight(0xfff2d6, 0.9);
+const sun = new THREE.DirectionalLight(0xfff2c9, 0.9);
 sun.position.set(200,400,-200);
 sun.castShadow = true;
-sun.shadow.camera.left = -500; sun.shadow.camera.right = 500; sun.shadow.camera.top = 500; sun.shadow.camera.bottom = -500;
 sun.shadow.mapSize.set(2048,2048);
 scene.add(sun);
 
-///////////////////////
-// Terrain & Water
-///////////////////////
-// simple low-res height variation for shorelines
-const terrainGeo = new THREE.PlaneGeometry(WORLD.size, WORLD.size, 64, 64);
+/* -------------------------
+   Terrain & Water
+   ------------------------- */
+const terrainGeo = new THREE.PlaneGeometry(CONFIG.worldSize, CONFIG.worldSize, 96, 96);
 terrainGeo.rotateX(-Math.PI/2);
 for(let i=0;i<terrainGeo.attributes.position.count;i++){
   const x = terrainGeo.attributes.position.getX(i);
   const z = terrainGeo.attributes.position.getZ(i);
   const d = Math.hypot(x,z);
   let h = Math.sin(x*0.002)*6 + Math.cos(z*0.002)*6 + Math.sin((x+z)*0.001)*3;
-  // gentle hills
-  h *= clamp(1 - (d / (WORLD.size/1.6)), 0.12, 1);
-  terrainGeo.attributes.position.setY(i, h - 2); // bias down to create water
+  h *= clamp(1 - (d / (CONFIG.worldSize/1.5)), 0.08, 1);
+  terrainGeo.attributes.position.setY(i, h - 3);
 }
 terrainGeo.computeVertexNormals();
-const terrainMat = new THREE.MeshStandardMaterial({ color:0x3a8a3a, roughness:1 });
+const terrainMat = new THREE.MeshStandardMaterial({ color:0x3b8a3b, roughness:1 });
 const terrain = new THREE.Mesh(terrainGeo, terrainMat);
 terrain.receiveShadow = true;
 scene.add(terrain);
 
-// large water plane (transparent)
-const waterMat = new THREE.MeshStandardMaterial({ color:0x1e88ff, transparent:true, opacity:0.86, roughness:0.3, metalness:0.02 });
-const water = new THREE.Mesh(new THREE.PlaneGeometry(WORLD.size*2, WORLD.size*2), waterMat);
-water.rotation.x = -Math.PI/2;
-water.position.y = WORLD.waterLevel;
+/* Water plane (simple) */
+const waterMat = new THREE.MeshStandardMaterial({ color:0x1e88ff, transparent:true, opacity:0.86, roughness:0.4 });
+const water = new THREE.Mesh(new THREE.PlaneGeometry(CONFIG.worldSize*2, CONFIG.worldSize*2), waterMat);
+water.rotation.x = -Math.PI/2; water.position.y = CONFIG.waterLevel;
 scene.add(water);
 
-///////////////////////
-// Decorations: trees, reeds, rocks
-///////////////////////
-const decorGroup = new THREE.Group();
-scene.add(decorGroup);
-function spawnDecor(){
-  for(let i=0;i<400;i++){
-    const x = rand(-WORLD.size/2, WORLD.size/2);
-    const z = rand(-WORLD.size/2, WORLD.size/2);
-    const h = getTerrainHeightAt(x,z);
-    if(h < WORLD.waterLevel - 1) continue;
+/* -------------------------
+   Decorations (low poly)
+   ------------------------- */
+const decor = new THREE.Group(); scene.add(decor);
+function createDecor(){
+  const count = Math.floor(280 * CONFIG.detailScale);
+  for(let i=0;i<count;i++){
+    const x = rand(-CONFIG.worldSize/2, CONFIG.worldSize/2);
+    const z = rand(-CONFIG.worldSize/2, CONFIG.worldSize/2);
+    const h = getHeightAt(x,z);
+    if(h < CONFIG.waterLevel - 1) continue;
     if(Math.random() < 0.6){
       // tree
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.32,2), new THREE.MeshStandardMaterial({color:0x7b4c2b}));
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.28,2), new THREE.MeshStandardMaterial({color:0x7b4c2b}));
       trunk.position.set(x, h + 1, z);
-      const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.4 + Math.random()*0.8, 3 + Math.random()*2, 6), new THREE.MeshStandardMaterial({color:0x0f6a2f}));
-      leaves.position.set(x, h + 3.2, z);
+      const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.4 + Math.random()*0.6, 3 + Math.random()*1.4, 6), new THREE.MeshStandardMaterial({color:0x134f2a}));
+      leaves.position.set(x, h + 3.1, z);
       trunk.castShadow = true; leaves.castShadow = true;
-      decorGroup.add(trunk); decorGroup.add(leaves);
+      decor.add(trunk); decor.add(leaves);
     } else {
-      // reed / bush
-      if(Math.random()<0.5){
-        const r = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.4), new THREE.MeshStandardMaterial({color:0x3b7b3b}));
-        r.position.set(x,h+0.7,z); decorGroup.add(r);
+      // rock / reed
+      if(Math.random() < 0.55){
+        const r = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.4), new THREE.MeshStandardMaterial({color:0x345c2f}));
+        r.position.set(x,h+0.7,z); decor.add(r);
       } else {
-        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.6 + Math.random()*1.2), new THREE.MeshStandardMaterial({color:0x666666}));
-        rock.position.set(x,h+0.4,z); rock.rotation.set(Math.random(),Math.random(),Math.random());
-        decorGroup.add(rock);
+        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.6 + Math.random()*1.3), new THREE.MeshStandardMaterial({color:0x666666}));
+        rock.position.set(x,h+0.4,z); rock.rotation.set(Math.random(),Math.random(),Math.random()); decor.add(rock);
       }
     }
   }
 }
-spawnDecor();
+createDecor();
 
-///////////////////////
-// Utility: sample terrain height
-///////////////////////
-function getTerrainHeightAt(worldX,worldZ){
-  // approximate using plane geometry logic (simple noise approximation)
-  // For performance we re-evaluate similar function used above.
-  const x = worldX, z = worldZ;
+/* Height sampling helper (same function as terrain builder approximation) */
+function getHeightAt(x,z){
   let h = Math.sin(x*0.002)*6 + Math.cos(z*0.002)*6 + Math.sin((x+z)*0.001)*3;
   const d = Math.hypot(x,z);
-  h *= clamp(1 - (d / (WORLD.size/1.6)), 0.12, 1);
-  return h - 2;
+  h *= clamp(1 - (d / (CONFIG.worldSize/1.5)), 0.08, 1);
+  return h - 3;
 }
 
-///////////////////////
-// Player & Controls
-///////////////////////
+/* -------------------------
+   Player & Controls
+   ------------------------- */
 const player = {
-  pos: new THREE.Vector3(WORLD.size*0.05, 0, WORLD.size*0.05),
-  velocity: new THREE.Vector3(),
-  height: 2,
-  inBoat: false,
-  boat: null,
+  pos: new THREE.Vector3(30,0,30),
+  height: 1.85,
   stamina: 100,
   health: 100,
-  cameraDistance: 0 // 0 = first person, positive = third-person offset
+  cameraMode: 0, // 0 FP, 1 short TP, 2 mid TP
+  inBoat: false,
+  boat: null
 };
 
-camera.position.copy(player.pos).add(new THREE.Vector3(0, player.height + 1.6, 5));
+camera.position.copy(player.pos).add(new THREE.Vector3(0, player.height + 1.4, 6));
+camera.lookAt(player.pos.x, player.pos.y + 1.4, player.pos.z);
 
-let keys = {};
-window.addEventListener('keydown', (e)=> { keys[e.code] = true; });
-window.addEventListener('keyup', (e)=> { keys[e.code] = false; });
+let yaw = 0, pitch = 0;
+const keys = {};
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+document.body.addEventListener('click', ()=>{ if(audioCtx.state==='suspended') audioCtx.resume(); document.body.requestPointerLock && document.body.requestPointerLock(); });
 
-// pointer lock & mouse look
-let yaw=0, pitch=0;
-document.body.addEventListener('click', ()=> {
-  if(audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
-  document.body.requestPointerLock && document.body.requestPointerLock();
-});
-document.addEventListener('pointerlockchange', ()=>{/* nothing for now */});
-document.addEventListener('mousemove', (e)=>{
+document.addEventListener('mousemove', e => {
   if(document.pointerLockElement === document.body){
     yaw -= e.movementX * 0.0022;
     pitch -= e.movementY * 0.0022;
@@ -254,272 +221,312 @@ document.addEventListener('mousemove', (e)=>{
 });
 
 function updatePlayer(dt){
-  const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-  const right = new THREE.Vector3(forward.z, 0, -forward.x);
+  const forward = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+  const right = new THREE.Vector3(forward.z,0,-forward.x);
   const move = new THREE.Vector3();
   if(keys['KeyW']) move.add(forward);
   if(keys['KeyS']) move.sub(forward);
   if(keys['KeyA']) move.sub(right);
   if(keys['KeyD']) move.add(right);
-  if(move.lengthSq() > 0) move.normalize();
+  if(move.lengthSq()>0) move.normalize();
 
-  let speed = player.inBoat ? 6 : (keys['ShiftLeft'] ? 6 : 3);
-  // stamina effects when sprinting
+  let speed = player.inBoat ? 5 : (keys['ShiftLeft'] ? 5 : 2.2);
+  // stamina drain if sprinting
   if(!player.inBoat && keys['ShiftLeft'] && player.stamina > 0){
-    player.stamina = clamp(player.stamina - dt*12, 0, 100);
+    player.stamina = clamp(player.stamina - dt*14, 0, 100);
   } else {
     player.stamina = clamp(player.stamina + dt*6, 0, 100);
   }
 
-  // apply movement
   const deltaMove = move.multiplyScalar(speed * dt * 4);
   player.pos.add(deltaMove);
 
-  // clamp to world
-  player.pos.x = clamp(player.pos.x, -WORLD.size/2 + 5, WORLD.size/2 - 5);
-  player.pos.z = clamp(player.pos.z, -WORLD.size/2 + 5, WORLD.size/2 - 5);
-  player.pos.y = getTerrainHeightAt(player.pos.x, player.pos.z) + player.height;
+  // clamp world bounds
+  player.pos.x = clamp(player.pos.x, -CONFIG.worldSize/2 + 6, CONFIG.worldSize/2 - 6);
+  player.pos.z = clamp(player.pos.z, -CONFIG.worldSize/2 + 6, CONFIG.worldSize/2 - 6);
+  player.pos.y = getHeightAt(player.pos.x, player.pos.z) + player.height;
 
-  // firing camera
-  const camOffset = new THREE.Vector3(0, player.height + 1.2, 0);
-  const camBase = player.pos.clone().add(camOffset);
-  // third person offset when cameraDistance > 0
-  const behind = new THREE.Vector3(0, 0, Math.max(0, player.cameraDistance + 6)).applyEuler(new THREE.Euler(0, yaw, 0));
+  // camera
+  const camBase = player.pos.clone().add(new THREE.Vector3(0, player.height + 0.6, 0));
+  const behind = new THREE.Vector3(0, 0, (player.cameraMode === 0 ? 0 : (player.cameraMode===1?6:12))).applyEuler(new THREE.Euler(0, yaw, 0));
   camera.position.copy(camBase).add(behind);
   camera.lookAt(camBase);
 }
 
-///////////////////////
-// Boat
-///////////////////////
+/* -------------------------
+   Boats (simple)
+   ------------------------- */
 const boats = [];
 function spawnBoat(x,z){
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(3,0.6,1.8), new THREE.MeshStandardMaterial({color:0x9e5a3c}));
-  hull.position.set(x, getTerrainHeightAt(x,z)+0.2, z);
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(3,0.6,1.6), new THREE.MeshStandardMaterial({color:0x9e5a3c}));
+  hull.position.set(x, getHeightAt(x,z) + 0.2, z);
   hull.castShadow = true;
   scene.add(hull);
-  boats.push({mesh:hull, pos:new THREE.Vector3(x,hull.position.y,z), dir:0, speed:0});
+  boats.push({mesh:hull, pos:new THREE.Vector3(x,hull.position.y,z), dir:rand(0,Math.PI*2), speed:0});
 }
-// spawn a few boats near shore
+// spawn near waterline a few boats
 for(let i=0;i<6;i++){
-  spawnBoat(rand(-WORLD.size*0.3, WORLD.size*0.3), rand(-WORLD.size*0.3, WORLD.size*0.3));
+  spawnBoat(rand(-CONFIG.worldSize*0.25, CONFIG.worldSize*0.25), rand(-CONFIG.worldSize*0.25, CONFIG.worldSize*0.25));
+}
+function updateBoats(dt, t){
+  for(const b of boats){
+    b.dir += (Math.random()-0.5) * 0.01;
+    b.speed = clamp(0.2 + Math.sin(t*0.0005 + b.pos.x*0.001) * 0.6, 0.05, 1.1);
+    b.pos.x += Math.sin(b.dir) * b.speed * dt*6;
+    b.pos.z += Math.cos(b.dir) * b.speed * dt*6;
+    b.mesh.position.x = b.pos.x; b.mesh.position.z = b.pos.z;
+    b.mesh.position.y = getHeightAt(b.pos.x, b.pos.z) + 0.2;
+  }
 }
 
-function updateBoats(dt){
-  boats.forEach(b=>{
-    // simple idle drift when not occupied
-    b.dir += (Math.random()-0.5)*0.01;
-    b.speed = clamp((Math.sin(perfTime*0.0007 + b.pos.x*0.001) * 0.2 + 0.4), 0.05, 1.2);
-    b.pos.x += Math.sin(b.dir) * b.speed * dt;
-    b.pos.z += Math.cos(b.dir) * b.speed * dt;
-    b.mesh.position.x = b.pos.x;
-    b.mesh.position.z = b.pos.z;
-    b.mesh.position.y = getTerrainHeightAt(b.pos.x, b.pos.z) + 0.2;
-  });
+/* -------------------------
+   Animal (Hunt) system
+   ------------------------- */
+const animalSpecies = [
+  {name:'Deer', color:0xc4a176, size:1.6, speed:2.6, hp:60, points:60, rarity:0.7},
+  {name:'Boar', color:0x7b5e4a, size:1.3, speed:2.2, hp:110, points:40, rarity:0.9},
+  {name:'Rabbit', color:0xffffff, size:0.5, speed:3.2, hp:12, points:12, rarity:1.5}
+];
+
+const animals = [];
+function spawnAnimals(n = Math.floor(CONFIG.maxAnimals * CONFIG.detailScale)){
+  for(let i=0;i<n;i++){
+    const s = pick(animalSpecies);
+    let x,z, h;
+    do {
+      x = rand(-CONFIG.worldSize/2, CONFIG.worldSize/2);
+      z = rand(-CONFIG.worldSize/2, CONFIG.worldSize/2);
+      h = getHeightAt(x,z);
+    } while(h < CONFIG.waterLevel + 1 || Math.hypot(x,z) < 40);
+    const mesh = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(s.size*1.0, s.size*0.6, s.size*0.6), new THREE.MeshStandardMaterial({color:s.color}));
+    body.position.set(0,s.size*0.4,0);
+    mesh.add(body);
+    mesh.position.set(x,h+0.2,z);
+    mesh.userData = {species:s, state:'idle', target: null, hp: s.hp};
+    animals.push(mesh);
+    scene.add(mesh);
+  }
+}
+spawnAnimals();
+
+function updateAnimals(dt){
+  for(const a of animals){
+    const ud = a.userData;
+    if(ud.state === 'dead') continue;
+    // simple wandering
+    if(!ud.target || Math.random() < 0.008) {
+      ud.target = new THREE.Vector3(a.position.x + rand(-20,20), 0, a.position.z + rand(-20,20));
+      ud.target.y = getHeightAt(ud.target.x, ud.target.z) + 1.0;
+    }
+    const dir = new THREE.Vector3().subVectors(ud.target, a.position);
+    if(dir.length() > 1.2) {
+      dir.normalize();
+      a.position.addScaledVector(dir, ud.species.speed * dt * (ud.state === 'alert' ? 1.8 : 0.75));
+      a.position.y = getHeightAt(a.position.x, a.position.z) + 0.2;
+      a.lookAt(ud.target.x, a.position.y, ud.target.z);
+    } else {
+      if(Math.random() < 0.02) ud.target = null;
+    }
+    // detection: if player makes noise nearby (we model simple: sprinting noise)
+    const d = a.position.distanceTo(player.pos);
+    const playerNoise = (keys['ShiftLeft'] && (Math.abs(player.pos.x - a.position.x) > 0 || Math.abs(player.pos.z - a.position.z) > 0)) ? 1.0 : 0.15;
+    if(d < 45 * (1 + playerNoise) && Math.random() < 0.003 * (1 + playerNoise*6)) {
+      ud.state = 'alert';
+      // flee away from player
+      const away = new THREE.Vector3().subVectors(a.position, player.pos).normalize();
+      ud.target = a.position.clone().add(away.multiplyScalar(40));
+    }
+  }
 }
 
-///////////////////////
-// Fish system
-///////////////////////
+/* -------------------------
+   Hunting weapons (simple hitscan rifle)
+   ------------------------- */
+let currentWeapon = 'rifle';
+let ammo = 12;
+const weaponCfg = {rifle:{damage:60,range:450,fireRate:0.28,spread:0.006}};
+
+let lastFire = -999;
+function fireWeapon(){
+  const now = performance.now()/1000;
+  if(now - lastFire < weaponCfg.rifle.fireRate) return;
+  if(ammo <= 0){ sfx(140,0.14,0.02,'triangle'); return; }
+  lastFire = now; ammo--; document.getElementById('ammo').textContent = ammo;
+  // hitscan: check animals
+  const origin = camera.position.clone();
+  const dir = new THREE.Vector3(0,0,-1).applyEuler(camera.rotation).normalize();
+  // add spread
+  dir.x += (Math.random()*2-1) * weaponCfg.rifle.spread;
+  dir.y += (Math.random()*2-1) * weaponCfg.rifle.spread;
+  dir.normalize();
+  // check animals by simple distance to ray
+  let hit = null, best = 1e9;
+  for(const a of animals){
+    if(a.userData.state === 'dead') continue;
+    const toA = new THREE.Vector3().subVectors(a.position, origin);
+    const proj = toA.dot(dir);
+    if(proj > 0 && proj < weaponCfg.rifle.range){
+      const closest = origin.clone().add(dir.clone().multiplyScalar(proj));
+      const d = closest.distanceTo(a.position);
+      if(d < 2.2 && proj < best){ best = proj; hit = a; }
+    }
+  }
+  if(hit){
+    sfx(1200, 0.06, 0.05, 'square');
+    hit.userData.hp -= weaponCfg.rifle.damage;
+    if(hit.userData.hp <= 0){
+      hit.userData.state = 'dead';
+      // drop carcass (simple)
+      scene.remove(hit);
+      const idx = animals.indexOf(hit); if(idx>=0) animals.splice(idx,1);
+      const pts = hit.userData.species.points;
+      score += pts; updateHUD();
+      showMessage(`Down: ${hit.userData.species.name} +${pts}`);
+      // spawn replacement later
+      setTimeout(()=> spawnAnimals(1), 5000);
+    } else {
+      hit.userData.state = 'alert';
+      showMessage(`${hit.userData.species.name} wounded!`);
+    }
+  } else {
+    // miss => tracer (very short)
+    sfx(900, 0.06, 0.04, 'sine');
+  }
+}
+
+/* -------------------------
+   Fish system (detailed)
+   ------------------------- */
 const fishSpecies = [
-  // name, biome (array), weight range, rarity (1..10), fight (toughness), speed
   {name:'Brown Trout', biomes:['Lake','River'], weight:[0.6,3], rarity:5, fight:20, speed:0.8, points:25},
-  {name:'Largemouth Bass', biomes:['Lake','Marsh'], weight:[0.8,5], rarity:6, fight:28, speed:0.9, points:35},
-  {name:'Northern Pike', biomes:['Marsh','Lake'], weight:[1.2,8], rarity:4, fight:40, speed:1.2, points:50},
+  {name:'Bass', biomes:['Lake','Marsh'], weight:[0.8,5], rarity:6, fight:28, speed:0.9, points:35},
+  {name:'Pike', biomes:['Marsh','Lake'], weight:[1.2,8], rarity:4, fight:40, speed:1.2, points:50},
   {name:'Catfish', biomes:['River','Marsh'], weight:[1.5,10], rarity:3, fight:45, speed:0.6, points:45},
   {name:'Salmon', biomes:['River','Ocean'], weight:[2,12], rarity:2, fight:60, speed:1.3, points:70},
   {name:'Tuna', biomes:['Ocean'], weight:[10,40], rarity:1, fight:120, speed:1.8, points:150},
-  {name:'Carp', biomes:['Marsh','Lake'], weight:[1,6], rarity:7, fight:18, speed:0.7, points:20},
-  {name:'Mackerel', biomes:['Ocean'], weight:[0.5,2], rarity:8, fight:12, speed:1.1, points:15},
-  {name:'Marlin', biomes:['Ocean'], weight:[70,400], rarity:0.2, fight:280, speed:2.4, points:500}
+  {name:'Mackerel', biomes:['Ocean'], weight:[0.5,2], rarity:8, fight:12, speed:1.1, points:15}
 ];
 
-const fishPool = []; // active fish (limited count)
-
-function spawnFishAcrossWorld(count=120){
+const fishPool = [];
+function spawnFish(count = Math.floor(CONFIG.maxFish * CONFIG.detailScale)){
   for(let i=0;i<count;i++){
-    spawnSingleFish(rand(-WORLD.size/2, WORLD.size/2), rand(-WORLD.size/2, WORLD.size/2));
+    spawnSingleFish(rand(-CONFIG.worldSize/2, CONFIG.worldSize/2), rand(-CONFIG.worldSize/2, CONFIG.worldSize/2));
   }
 }
 function spawnSingleFish(x,z){
-  const biome = biomeAt(x,z);
-  // pick species weighted by rarity and matching biome
-  const candidates = fishSpecies.filter(s=>s.biomes.includes(biome));
-  if(candidates.length===0) return;
-  // weighted pick
-  const total = candidates.reduce((sum,s)=> sum + (1/s.rarity), 0);
-  let r = Math.random() * total;
-  let chosen = candidates[0];
-  for(const s of candidates){
-    r -= (1/s.rarity);
-    if(r <= 0){ chosen = s; break; }
-  }
-  // create fish
+  const b = biomeAt(x,z);
+  const candidates = fishSpecies.filter(s => s.biomes.includes(b));
+  if(candidates.length === 0) return;
+  const s = pick(candidates);
   const fish = {
-    species: chosen,
-    pos: new THREE.Vector3(x, 0, z),
-    depth: WORLD.waterLevel - rand(0.2, 3.5),
+    species: s,
+    pos: new THREE.Vector3(x,0,z),
+    depth: CONFIG.waterLevel - rand(0.2, 3.5),
     dir: rand(0,Math.PI*2),
-    speed: chosen.speed * (0.6 + Math.random()*0.9),
-    size: rand(chosen.weight[0], chosen.weight[1]),
+    speed: s.speed * (0.6 + Math.random()*0.9),
+    size: rand(s.weight[0], s.weight[1]),
     state: 'swim',
     mesh: null
   };
-  // simple visual: small colored sphere
-  const color = (chosen.points > 100) ? 0xffd27a : (chosen.points > 40 ? 0xffb27a : 0xa0e2ff);
-  const m = new THREE.Mesh(new THREE.SphereGeometry(clamp(0.08 + fish.size*0.03, 0.08, 1.8), 8, 6), new THREE.MeshStandardMaterial({color}));
+  const color = s.points > 100 ? 0xffd27a : (s.points > 40 ? 0xffb27a : 0xa0e2ff);
+  const m = new THREE.Mesh(new THREE.SphereGeometry(clamp(0.08 + fish.size*0.03, 0.08, 1.2), 8, 6), new THREE.MeshStandardMaterial({color}));
   m.position.set(x, fish.depth, z);
-  scene.add(m);
-  fish.mesh = m;
-  fishPool.push(fish);
+  scene.add(m); fish.mesh = m; fishPool.push(fish);
 }
+spawnFish();
 
-spawnFishAcrossWorld(140);
-
+/* Simple biome mapping */
 function biomeAt(x,z){
-  // simple biome mapping by world quadrants/z positions
-  if(z > WORLD.size*0.15) return 'Ocean';
-  if(z < -WORLD.size*0.15) return 'River';
-  if(x > WORLD.size*0.25) return 'Marsh';
+  if(z > CONFIG.worldSize*0.18) return 'Ocean';
+  if(z < -CONFIG.worldSize*0.18) return 'River';
+  if(x > CONFIG.worldSize*0.25) return 'Marsh';
   return 'Lake';
 }
 
-// update fish movement & behavior
+/* Fish behavior update */
 function updateFish(dt){
   for(const f of fishPool){
     if(f.state === 'onhook') continue;
-    // wander with per-species speed
-    f.dir += (Math.random()-0.5) * 0.4 * dt;
-    // bias to remain near shore or open water based on species? Skip for simplicity
-    const dx = Math.cos(f.dir) * f.speed * dt * 10;
-    const dz = Math.sin(f.dir) * f.speed * dt * 10;
-    f.pos.x += dx;
-    f.pos.z += dz;
-    // keep within world bounds
-    f.pos.x = clamp(f.pos.x, -WORLD.size/2 + 5, WORLD.size/2 - 5);
-    f.pos.z = clamp(f.pos.z, -WORLD.size/2 + 5, WORLD.size/2 - 5);
-    // animate bobbing in depth
-    f.depth += Math.sin(perfTime*0.001 + f.pos.x*0.001)*0.002;
-    // set mesh position
-    f.mesh.position.set(f.pos.x, f.depth, f.pos.z);
-    // occasionally change dir
-    if(Math.random() < 0.01) f.dir += (Math.random()-0.5) * 1.5;
+    f.dir += (Math.random()-0.5) * 0.4 * dt * 5;
+    f.pos.x += Math.cos(f.dir) * f.speed * dt * 10;
+    f.pos.z += Math.sin(f.dir) * f.speed * dt * 10;
+    f.pos.x = clamp(f.pos.x, -CONFIG.worldSize/2 + 3, CONFIG.worldSize/2 - 3);
+    f.pos.z = clamp(f.pos.z, -CONFIG.worldSize/2 + 3, CONFIG.worldSize/2 - 3);
+    f.depth += Math.sin(perfTime*0.001 + f.pos.x*0.001) * 0.002;
+    if(f.mesh) f.mesh.position.set(f.pos.x, f.depth, f.pos.z);
+    if(Math.random() < 0.005) f.dir += (Math.random()-0.5);
   }
 }
 
-///////////////////////
-// Casting & Bobber & Bite logic
-///////////////////////
-let currentLureIndex = 0;
+/* -------------------------
+   Casting & Reeling logic
+   ------------------------- */
 const lures = [
-  {name:'Standard Lure', castMult:1.0, attract:1.0},
-  {name:'Heavy Spoon', castMult:1.4, attract:0.8},
-  {name:'Feather Jig', castMult:0.8, attract:1.5},
-  {name:'Deep Diver', castMult:1.2, attract:1.2}
+  {name:'Standard',castMult:1.0,attract:1.0},
+  {name:'Heavy',castMult:1.4,attract:0.8},
+  {name:'Feather',castMult:0.8,attract:1.5},
+  {name:'Deep',castMult:1.2,attract:1.2}
 ];
-
+let currentLureIndex = 0;
 let castCharging = false;
 let castPower = 0;
-let bobber = null; // object: {mesh, pos, vel, timeInWater, targetFish}
-let fishHooked = null; // reference to fish from pool
-let biteTimer = 0;
-let reeling = false;
-let tension = 0; // 0..1 safe range; if > 1 fish may snap
+let bobber = null;
+let hookedFish = null;
+let reelingState = null;
+let mouseDown = false;
 
-// UI references
-const biomeLabel = document.getElementById('biomeLabel');
-const timeLabel = document.getElementById('timeLabel');
-const healthLabel = document.getElementById('healthLabel');
-const staminaLabel = document.getElementById('staminaLabel');
-const scoreLabel = document.getElementById('scoreLabel');
-const highScoreEl = document.getElementById('highScore');
-const tackleLabel = document.getElementById('tackleLabel');
-const baitLabel = document.getElementById('baitLabel');
-const lineLabel = document.getElementById('lineLabel');
-const modeLabel = document.getElementById('modeLabel');
-const lureCount = document.getElementById('lureCount');
+document.addEventListener('mousedown', e => {
+  if(e.button === 0){ mouseDown = true; if(!bobber && !reelingState) startCharge(); else if(reelingState) reelingState.playerReeling=true; }
+});
+document.addEventListener('mouseup', e => {
+  if(e.button === 0){ mouseDown = false; if(castCharging) releaseCast(); if(reelingState) reelingState.playerReeling=false; }
+});
+document.addEventListener('keydown', e => {
+  if(e.code === 'KeyR'){ currentLureIndex = (currentLureIndex + 1) % lures.length; sfx(660,0.06,0.03); }
+  if(e.code === 'KeyB') toggleBoardBoat();
+  if(e.code === 'KeyC') player.cameraMode = (player.cameraMode + 1) % 3;
+  if(e.code === 'KeyM') document.getElementById('minimap').parentElement.style.display = document.getElementById('minimap').parentElement.style.display === 'none' ? 'block' : 'none';
+});
 
-let score = 0;
-let highScore = Number(localStorage.getItem('uf_highscore') || 0);
-highScoreEl.textContent = highScore;
-
-// initial tackle
-let currentLure = lures[currentLureIndex];
-tackleLabel.textContent = currentLure.name;
-baitLabel.textContent = 'Worms';
-lineLabel.textContent = 'Medium';
-
-function startCastCharge(){
-  if(bobber || reeling) return;
-  castCharging = true;
-  castPower = 0;
-}
+function startCharge(){ if(bobber || reelingState) return; castCharging = true; castPower = 0; }
 function releaseCast(){
-  if(!castCharging) return;
   castCharging = false;
-  // compute cast velocity based on power and lure multiplier
-  const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, yaw, 0)).normalize();
+  const dir = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation).normalize();
   const base = 14 * (0.35 + 1.65 * (castPower / 100));
-  const vel = dir.clone().multiplyScalar(base * currentLure.castMult);
-  // spawn bobber at camera position
-  const bob = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), new THREE.MeshStandardMaterial({color:0xff4d6d}));
-  bob.castShadow = false;
-  bob.position.copy(camera.position).add(new THREE.Vector3(0, -0.2, 0)).add(dir.clone().multiplyScalar(1.5));
-  scene.add(bob);
-  bobber = {mesh: bob, vel, timeInWater:0, landed:false, targetFish:null};
-  beep(880, 0.06, 0.04);
+  const vel = dir.clone().multiplyScalar(base * lures[currentLureIndex].castMult);
+  // spawn bobber near camera
+  const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), new THREE.MeshStandardMaterial({color:0xff4d6d}));
+  sphere.position.copy(camera.position).add(new THREE.Vector3(0, -0.2, 0)).add(dir.clone().multiplyScalar(1.4));
+  scene.add(sphere);
+  bobber = {mesh:sphere, vel, timeInWater:0, landed:false};
+  sfx(880,0.06,0.04);
 }
-function cancelCast(){
-  castCharging = false;
-  castPower = 0;
-}
-
-// hook detection: when bobber lands near fish and time passes, fish may bite
 function updateBobber(dt){
   if(!bobber) return;
   if(!bobber.landed){
-    // integrate flight
-    bobber.vel.y -= 9.8 * dt * 0.6; // gravity
+    bobber.vel.y -= 9.8 * dt * 0.65;
     bobber.mesh.position.add(bobber.vel.clone().multiplyScalar(dt));
-    // simple ground/water collision
-    if(bobber.mesh.position.y <= WORLD.waterLevel + 0.1){
-      // landed in water
-      bobber.landed = true;
-      bobber.mesh.position.y = WORLD.waterLevel + 0.05;
-      bobber.timeInWater = 0;
-      // small splash effect: could add particles (skipped for perf)
-      beep(440, 0.06, 0.03);
+    if(bobber.mesh.position.y <= CONFIG.waterLevel + 0.05){
+      bobber.landed = true; bobber.mesh.position.y = CONFIG.waterLevel + 0.05; bobber.timeInWater = 0; sfx(420,0.08,0.03);
     }
   } else {
     bobber.timeInWater += dt;
-    // drift a tiny bit by wind (simple)
-    bobber.mesh.position.x += Math.sin(perfTime*0.001) * 0.005;
-    bobber.mesh.position.z += Math.cos(perfTime*0.001) * 0.005;
-
-    // if already hooked nothing else; if not: check for nearby fish to be tempted
-    if(!fishHooked && bobber.timeInWater > 0.6){
-      // find fish within radius weighted by lure attract factor and fish rarity
-      const bpos = new THREE.Vector3(bobber.mesh.position.x, 0, bobber.mesh.position.z);
-      let candidates = fishPool.filter(f=>{
+    bobber.mesh.position.x += Math.sin(perfTime*0.001) * 0.008;
+    bobber.mesh.position.z += Math.cos(perfTime*0.001) * 0.008;
+    if(!hookedFish && bobber.timeInWater > 0.8){
+      const bpos = new THREE.Vector3(bobber.mesh.position.x,0,bobber.mesh.position.z);
+      const candidates = fishPool.filter(f => {
         const d = Math.hypot(f.pos.x - bpos.x, f.pos.z - bpos.z);
-        return d < (15 * currentLure.attract) && f.state === 'swim';
+        return d < (18 * lures[currentLureIndex].attract) && f.state === 'swim';
       });
       if(candidates.length > 0){
-        // chance depends on time in water and lure attract & fish rarity
         for(const f of candidates){
-          const baseChance = 0.001 * (1 + currentLure.attract) * (2 / (f.species.rarity || 1));
-          const timeFactor = clamp(bobber.timeInWater / 8, 0, 1);
-          const chance = baseChance * (0.6 + timeFactor*1.6);
+          const chance = 0.0008 * (1 + lures[currentLureIndex].attract) * (2 / (f.species.rarity || 1)) * (1 + bobber.timeInWater/4);
           if(Math.random() < chance){
             // fish bites
-            fishHooked = f;
-            f.state = 'onhook';
-            f.hookOffset = new THREE.Vector3().subVectors(f.pos, bobber.mesh.position);
-            // attach fish to bobber
-            beep(1200, 0.08, 0.08);
-            showMessage("Fish bit: " + f.species.name + " — reel!");
-            // start reeling mini-game state
-            startReeling(f);
+            hookedFish = f; f.state = 'onhook';
+            sfx(1200,0.08,0.06); showMessage(`Bite! ${f.species.name} on hook — reel!`); startReel(f);
             break;
           }
         }
@@ -528,320 +535,206 @@ function updateBobber(dt){
   }
 }
 
-///////////////////////
-// Reeling mini game (tension mechanic)
-///////////////////////
-let reelingState = null; // {fish, progress, fishEnergy, playerEnergy, active}
-function startReeling(fish){
+/* Reeling mini-game simplified and optimized for responsiveness */
+function startReel(fish){
   reelingState = {
     fish,
-    progress: 0,        // towards 100 => caught
-    fishEnergy: fish.species.fight * (0.7 + Math.random()*0.8), // how hard fish fights
-    playerEnergy: 80,   // stamina-like capacity
-    tension: 0.2,       // 0..1
-    timer: 0
+    progress:0,
+    fishEnergy: fish.species.fight * (0.8 + Math.random()*0.9),
+    playerEnergy: 80,
+    tension: 0,
+    playerReeling: false
   };
-  reeling = true;
 }
-
 function updateReeling(dt){
   if(!reelingState) return;
   const st = reelingState;
-  st.timer += dt;
-  // fish pulls unpredictably (higher power for stronger fish)
-  const fishPull = (Math.sin(perfTime * 0.01 + st.fish.fpos) * 0.5 + 0.5) * st.fishEnergy * 0.02;
-  // player can reel by holding LMB -> increases progress but increases tension
-  let playerPull = 0;
-  if(mouseDown) { playerPull = 1.0 + (st.playerEnergy/100); st.playerEnergy = clamp(st.playerEnergy - dt*8, 0, 200); }
-  else { st.playerEnergy = clamp(st.playerEnergy + dt*6, 0, 200); }
-
-  // tension increases with difference fishPull - playerPull (roughly)
-  st.tension += (fishPull*0.01 - playerPull*0.01) * dt * 6;
-  st.tension = clamp(st.tension, 0, 1.6); // >1 danger zone
-
-  // update progress if player reels
-  if(playerPull > 0.5){
-    const gain = (playerPull*6 - fishPull*0.6) * dt;
-    st.progress = clamp(st.progress + gain, 0, 100);
+  // fish pulls
+  const fishPull = (Math.random() * st.fishEnergy * 0.01);
+  const playerPull = st.playerReeling ? (1.8 + (st.playerEnergy/100)) : 0;
+  st.tension += (fishPull*0.02 - playerPull*0.02) * dt * 6;
+  st.tension = clamp(st.tension, 0, 1.6);
+  if(st.playerReeling){
+    st.progress = clamp(st.progress + (playerPull*6 - fishPull*0.6) * dt * 6, 0, 100);
+    st.playerEnergy = clamp(st.playerEnergy - dt*12, 0, 200);
   } else {
-    // fish may pull back progress
-    st.progress = clamp(st.progress - fishPull * dt * 0.1, 0, 100);
+    st.progress = clamp(st.progress - fishPull * dt * 8, 0, 100);
+    st.playerEnergy = clamp(st.playerEnergy + dt*6, 0, 200);
   }
-
-  // update tension bar and visual
-  // if tension > 1.2 then line may snap: chance scaled by tension and fishEnergy
-  if(st.tension > 1.1){
-    const snapChancePerSec = (st.tension - 1.0) * 0.8;
-    if(Math.random() < snapChancePerSec * dt){
-      // broken line
-      showMessage("Line snapped!");
-      endReeling(false, true);
-      return;
-    }
-  }
-
-  // if progress reaches 100: success
-  if(st.progress >= 100){
-    endReeling(true, false);
+  // failure conditions
+  if(st.tension > 1.1 && Math.random() < (st.tension - 1.0) * dt * 6){
+    // snap
+    showMessage('Line snapped!'); sfx(120,0.12,0.02,'triangle'); endReel(false, true);
     return;
   }
-
-  // if playerEnergy reduced to 0, fail
   if(st.playerEnergy <= 0){
-    showMessage("Too tired — fish escaped");
-    endReeling(false, false);
-    return;
+    showMessage('Too tired — fish escaped'); endReel(false, false); return;
+  }
+  if(st.progress >= 100){
+    endReel(true, false); return;
   }
 }
-
-function endReeling(success, broken){
+function endReel(success, broken){
   if(!reelingState) return;
   const f = reelingState.fish;
   if(success){
-    // award points proportional to fish size/species
     const pts = Math.round(f.size * 10 + f.species.points);
-    score += pts;
-    scoreLabel.textContent = score;
-    showMessage(`Caught: ${f.species.name} (${format(f.size)} kg) • +${pts}`);
-    // remove fish from world visually
+    score += pts; updateHUD();
+    showMessage(`Caught ${f.species.name} (${format(f.size)} kg) +${pts}`);
+    // remove fish entity
     scene.remove(f.mesh);
-    const idx = fishPool.indexOf(f);
-    if(idx >= 0) fishPool.splice(idx,1);
-    // spawn replacement after delay
-    setTimeout(()=> spawnSingleFish(rand(-WORLD.size/2, WORLD.size/2), rand(-WORLD.size/2, WORLD.size/2)), 1500);
+    const idx = fishPool.indexOf(f); if(idx>=0) fishPool.splice(idx,1);
+    setTimeout(()=> spawnSingleFish(rand(-CONFIG.worldSize/2, CONFIG.worldSize/2), rand(-CONFIG.worldSize/2, CONFIG.worldSize/2)), 2500);
   } else {
-    if(broken){
-      showMessage("Line snapped!");
-      // fish returns to swim (maybe injured) -> release
-      f.state = 'swim';
-    } else {
-      // fish escaped, back to swim
-      showMessage("Fish escaped!");
-      f.state = 'swim';
-    }
+    if(broken) showMessage('Line snapped — fish freed');
+    else showMessage('Fish escaped');
+    f.state = 'swim';
   }
-  // clean up bobber if any
+  // cleanup bobber
   if(bobber){ scene.remove(bobber.mesh); bobber = null; }
-  reeling = false;
-  reelingState = null;
+  hookedFish = null; reelingState = null;
 }
 
-///////////////////////
-// Minimap (simple top-down)
-///////////////////////
-const mmCanvas = document.getElementById('minimap');
-mmCanvas.width = mmCanvas.clientWidth * devicePixelRatio;
-mmCanvas.height = mmCanvas.clientHeight * devicePixelRatio;
-const mmCtx = mmCanvas.getContext('2d');
+/* -------------------------
+   HUD & Minimap
+   ------------------------- */
+const hud = {
+  biome: document.getElementById('biome'),
+  timeOfDay: document.getElementById('timeOfDay'),
+  health: document.getElementById('health'),
+  stamina: document.getElementById('stamina'),
+  staminaBar: document.getElementById('staminaBar'),
+  score: document.getElementById('score'),
+  highScore: document.getElementById('highScore'),
+  mode: document.getElementById('mode'),
+  weapon: document.getElementById('weapon'),
+  rod: document.getElementById('rod'),
+  ammo: document.getElementById('ammo'),
+  lures: document.getElementById('lures'),
+  message: document.getElementById('message')
+};
+let score = 0, highScore = Number(localStorage.getItem('mega_highscore') || 0);
+hud.highScore.textContent = highScore;
+hud.lures.textContent = 5; hud.ammo.textContent = ammo;
 
+function updateHUD(){
+  hud.biome.textContent = biomeAt(player.pos.x, player.pos.z);
+  hud.timeOfDay.textContent = (dayFactor > 0.45) ? 'Day' : 'Night';
+  hud.health.textContent = Math.floor(player.health);
+  hud.stamina.textContent = Math.floor(player.stamina);
+  hud.staminaBar.style.width = player.stamina + '%';
+  hud.score.textContent = score;
+  hud.mode.textContent = (bobber || reelingState) ? 'Fishing' : (currentWeapon ? 'Hunting' : 'Explore');
+  hud.weapon.textContent = currentWeapon;
+  hud.rod.textContent = lures[currentLureIndex].name;
+  hud.ammo.textContent = ammo;
+  hud.lures.textContent = Math.max(0,5); // placeholder inventory
+}
+function showMessage(t, dur=2000){
+  hud.message.textContent = t; hud.message.style.display = 'block';
+  setTimeout(()=> { hud.message.style.display = 'none'; }, dur);
+}
+
+/* Minimap */
+const mmCanvas = document.getElementById('minimap'); mmCanvas.width = mmCanvas.clientWidth * devicePixelRatio; mmCanvas.height = mmCanvas.clientHeight * devicePixelRatio;
+const mmCtx = mmCanvas.getContext('2d');
 function drawMinimap(){
   const w = mmCanvas.width, h = mmCanvas.height;
   mmCtx.clearRect(0,0,w,h);
-  // background
-  mmCtx.fillStyle = '#052035'; mmCtx.fillRect(0,0,w,h);
-  // translate world coords to minimap coords
-  const scale = 0.06; // world meters -> pixels
-  const cx = w/2, cy = h/2;
-  // draw fish (small dots)
+  mmCtx.fillStyle = '#051827'; mmCtx.fillRect(0,0,w,h);
+  const scale = 0.06; const cx = w/2, cy = h/2;
+  // fish
   for(const f of fishPool){
-    const dx = (f.pos.x - player.pos.x) * scale;
-    const dz = (f.pos.z - player.pos.z) * scale;
-    const px = cx + dx, py = cy + dz;
+    const dx = (f.pos.x - player.pos.x) * scale, dz = (f.pos.z - player.pos.z) * scale;
     mmCtx.fillStyle = f.species.points > 100 ? '#ffd27a' : '#7fe0ff';
-    mmCtx.beginPath(); mmCtx.arc(px,py,2,0,Math.PI*2); mmCtx.fill();
+    mmCtx.beginPath(); mmCtx.arc(cx + dx, cy + dz, 2, 0, Math.PI*2); mmCtx.fill();
   }
-  // draw boats
+  // animals
+  for(const a of animals){
+    const dx = (a.position.x - player.pos.x) * scale, dz = (a.position.z - player.pos.z) * scale;
+    mmCtx.fillStyle = '#f2c08d'; mmCtx.fillRect(cx + dx - 2, cy + dz - 2, 4, 4);
+  }
+  // boats
   for(const b of boats){
-    const dx = (b.pos.x - player.pos.x) * scale;
-    const dz = (b.pos.z - player.pos.z) * scale;
+    const dx = (b.pos.x - player.pos.x) * scale, dz = (b.pos.z - player.pos.z) * scale;
     mmCtx.fillStyle = '#c07b50'; mmCtx.fillRect(cx + dx - 2, cy + dz - 2, 4, 4);
   }
-  // draw player (triangle pointing)
-  mmCtx.save();
-  mmCtx.translate(cx, cy);
-  mmCtx.rotate(-yaw);
-  mmCtx.fillStyle = '#9fffbf';
-  mmCtx.beginPath(); mmCtx.moveTo(0,-6); mmCtx.lineTo(4,4); mmCtx.lineTo(-4,4); mmCtx.closePath(); mmCtx.fill();
-  mmCtx.restore();
+  // player
+  mmCtx.save(); mmCtx.translate(cx, cy); mmCtx.rotate(-yaw); mmCtx.fillStyle = '#9fffbf';
+  mmCtx.beginPath(); mmCtx.moveTo(0,-6); mmCtx.lineTo(4,4); mmCtx.lineTo(-4,4); mmCtx.closePath(); mmCtx.fill(); mmCtx.restore();
 }
 
-///////////////////////
-// HUD & Messages
-///////////////////////
-const messageEl = document.getElementById('message');
-let messageTimer = 0;
-function showMessage(t, duration=2200){
-  messageEl.textContent = t; messageEl.style.display = 'block';
-  messageTimer = duration;
-  beep(900, 0.06, 0.02);
-}
-
-///////////////////////
-// Time & Weather
-///////////////////////
-let perfTime = 0;
-let weather = { raining:false, wind: rand(-1,1) };
-let timeOfDay = 0; // 0..1 => cycles
+/* -------------------------
+   Time, weather
+   ------------------------- */
+let perfTime = 0, dayT = 0, dayFactor = 1;
+let weather = { rain:false, wind: rand(-1,1) };
 function updateDayNight(dt){
-  timeOfDay += dt / 240; // full cycle 240s
-  if(timeOfDay > 1) timeOfDay -= 1;
-  // set sky color
-  const dayFactor = Math.max(0, Math.cos((timeOfDay-0.5)*2*Math.PI) * 0.5 + 0.5);
-  const skyR = Math.floor(30 + dayFactor*120);
-  const skyG = Math.floor(50 + dayFactor*140);
-  const skyB = Math.floor(80 + dayFactor*200);
+  dayT += dt / CONFIG.dayLengthSec;
+  if(dayT > 1) dayT -= 1;
+  dayFactor = Math.max(0, Math.cos((dayT - 0.5)*2*Math.PI) * 0.5 + 0.5);
+  const skyR = Math.floor(20 + dayFactor*120), skyG = Math.floor(40 + dayFactor*150), skyB = Math.floor(70 + dayFactor*200);
   scene.background = new THREE.Color(`rgb(${skyR},${skyG},${skyB})`);
-  // move sun
-  const angle = timeOfDay * Math.PI * 2;
+  const angle = dayT * Math.PI * 2;
   sun.position.set(Math.cos(angle)*400, Math.sin(angle)*400, Math.sin(angle*0.6)*400);
-  // set labels
-  document.getElementById('timeLabel').textContent = (dayFactor > 0.45) ? 'Day' : 'Night';
-  document.getElementById('biomeLabel').textContent = biomeAt(player.pos.x, player.pos.z);
 }
 
-///////////////////////
-// Input state
-///////////////////////
-let mouseDown = false;
-window.addEventListener('mousedown', (e)=> {
-  if(e.button === 0) {
-    mouseDown = true;
-    if(!reelingState && !castCharging && !bobber) startCastCharge();
-    // if reelingState exists, that means player can hold to increase reel effort; handled in reeling update
-  }
-});
-window.addEventListener('mouseup', (e)=> {
-  if(e.button === 0) {
-    mouseDown = false;
-    if(castCharging) releaseCast();
-  }
-});
-window.addEventListener('keydown', (e)=>{
-  if(e.code === 'KeyR'){ currentLureIndex = (currentLureIndex + 1) % lures.length; currentLure = lures[currentLureIndex]; tackleLabel.textContent = currentLure.name; beep(660,0.06,0.03); }
-  if(e.code === 'KeyB'){ // board/unboard nearest boat if in range
-    if(!player.inBoat){
-      // find closest boat within 3m
-      let nearest = null; let nd = 9999;
-      for(const b of boats){ const d = camera.position.distanceTo(b.mesh.position); if(d < nd){ nd = d; nearest = b; } }
-      if(nearest && nd < 6){
-        player.inBoat = true; player.boat = nearest; modeLabel.textContent = 'Boat';
-        // snap player to boat
-        player.pos.copy(nearest.mesh.position).add(new THREE.Vector3(0,1.5,0)); showMessage('Boarded boat'); beep(760,0.06,0.04);
-      } else showMessage('No boat nearby');
-    } else {
-      player.inBoat = false; player.boat = null; modeLabel.textContent = 'On-Foot'; showMessage('Left boat'); beep(540,0.06,0.03);
-    }
-  }
-  if(e.code === 'KeyC'){ player.cameraDistance = (player.cameraDistance + 1) % 3; showMessage(['FP','TP-Short','TP-Mid'][player.cameraDistance]); }
-  if(e.code === 'KeyM'){ mmCanvas.parentElement.style.display = mmCanvas.parentElement.style.display === 'none' ? 'block' : 'none'; beep(800,0.04,0.02); }
-  if(e.code === 'KeyH'){ const help = document.getElementById('controls'); help.style.display = help.style.display === 'none' ? 'block' : 'none'; }
-});
-
-///////////////////////
-// Performance & Loop
-///////////////////////
+/* -------------------------
+   Performance friendly loop
+   ------------------------- */
 let last = performance.now();
-function gameLoop(now){
+function loop(now){
   const dt = Math.min(0.05, (now - last) / 1000);
-  last = now;
-  perfTime = now;
-
+  last = now; perfTime = now;
   // update
   updatePlayer(dt);
   updateBoats(dt);
+  updateAnimals(dt);
   updateFish(dt);
   updateBobber(dt);
   if(reelingState) updateReeling(dt);
   updateDayNight(dt);
-
-  // update HUD
-  document.getElementById('staminaLabel').textContent = Math.floor(player.stamina);
-  document.getElementById('healthLabel').textContent = Math.floor(player.health);
-  document.getElementById('scoreLabel').textContent = score;
-  document.getElementById('lureCount').textContent = Math.max(0, Math.floor(Math.random()*10)+3); // placeholder for inventory
-  document.getElementById('lineLabel').textContent = 'Medium';
-  document.getElementById('tackleLabel').textContent = currentLure.name;
-
-  // cast UI
-  if(castCharging){
-    castPower = clamp(castPower + dt * 56, 0, 100);
-    document.getElementById('staminaBar').style.width = (player.stamina) + '%';
-    // limit stamina while charging
-    player.stamina = clamp(player.stamina - dt*6, 0, 100);
-    document.querySelector('.panel .label') && (document.querySelector('.panel .label').textContent = 'Ultra Fishing'); // keep safe
-  }
-  else castPower = clamp(castPower - dt * 24, 0, 100);
-  // update cast bar in HUD (reuse staminaBar width if you want separate; instead update top-right small part)
-  // For simplicity: use document.getElementById('staminaBar') to show stamina; show cast via message element width
-  document.getElementById('staminaBar').style.width = player.stamina + '%';
-  document.getElementById('staminaLabel').textContent = Math.floor(player.stamina);
-
-  // minimap
+  updateHUD();
   drawMinimap();
 
-  // message timer
-  if(messageTimer > 0){ messageTimer -= dt*1000; if(messageTimer <= 0) messageEl.style.display = 'none'; }
-  // re-render
+  // cast charging UI
+  if(castCharging){ castPower = clamp(castPower + dt * 56, 0, 100); } else castPower = clamp(castPower - dt * 24, 0, 100);
+
+  // render
   renderer.render(scene, camera);
-  requestAnimationFrame(gameLoop);
+  requestAnimationFrame(loop);
 }
-requestAnimationFrame(gameLoop);
+requestAnimationFrame(loop);
 
-///////////////////////
-// Input state variable used in reeling
-///////////////////////
-let mouseDownLocal = false;
-window.addEventListener('mousedown', ()=> mouseDownLocal = true);
-window.addEventListener('mouseup', ()=> mouseDownLocal = false);
-const mouseDownRef = {get:()=> mouseDownLocal};
+/* -------------------------
+   Helpers & cleanup
+   ------------------------- */
+window.addEventListener('resize', ()=> { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
-///////////////////////
-// Initial camera & player placement & helpers
-///////////////////////
-player.pos.set(20,0,20);
-camera.position.copy(player.pos).add(new THREE.Vector3(0, player.height+1.6, 6));
-camera.lookAt(player.pos.x, player.pos.y + 1.6, player.pos.z);
+window.addEventListener('beforeunload', ()=> { if(score > highScore) localStorage.setItem('mega_highscore', score); });
 
-// small utility: spawn single fish accessible function (used earlier)
-function spawnSingleFish(x,z){
-  const biome = biomeAt(x,z);
-  const candidates = fishSpecies.filter(s=>s.biomes.includes(biome));
-  if(candidates.length===0) return;
-  // pick uniformly for now
-  const chosen = candidates[Math.floor(Math.random()*candidates.length)];
-  const fish = {
-    species: chosen,
-    pos: new THREE.Vector3(x, 0, z),
-    depth: WORLD.waterLevel - rand(0.2, 3.5),
-    dir: rand(0,Math.PI*2),
-    speed: chosen.speed * (0.6 + Math.random()*0.8),
-    size: rand(chosen.weight[0], chosen.weight[1]),
-    state: 'swim',
-    mesh: null
-  };
-  const color = (chosen.points > 100) ? 0xffd27a : (chosen.points > 40 ? 0xffb27a : 0xa0e2ff);
-  const m = new THREE.Mesh(new THREE.SphereGeometry(clamp(0.08 + fish.size*0.03, 0.08, 1.8), 8, 6), new THREE.MeshStandardMaterial({color}));
-  m.position.set(x, fish.depth, z);
-  scene.add(m);
-  fish.mesh = m;
-  fishPool.push(fish);
+/* Utilities for brevity */
+function updateFish(dt){ /* reuse earlier function to animate fish: see above */ 
+  // inlined for performance: move fish positions toward their dir
+  for(const f of fishPool){
+    if(f.state === 'onhook') continue;
+    f.dir += (Math.random()-0.5) * 0.4 * dt * 4;
+    f.pos.x += Math.cos(f.dir) * f.speed * dt * 10;
+    f.pos.z += Math.sin(f.dir) * f.speed * dt * 10;
+    f.pos.x = clamp(f.pos.x, -CONFIG.worldSize/2 + 3, CONFIG.worldSize/2 - 3);
+    f.pos.z = clamp(f.pos.z, -CONFIG.worldSize/2 + 3, CONFIG.worldSize/2 - 3);
+    f.depth += Math.sin(perfTime*0.0009 + f.pos.x*0.0012) * 0.002;
+    if(f.mesh) f.mesh.position.set(f.pos.x, f.depth, f.pos.z);
+    if(Math.random() < 0.005) f.dir += (Math.random()-0.5) * 0.8;
+  }
 }
 
-///////////////////////
-// Clean up on page unload: save highscore
-///////////////////////
-window.addEventListener('beforeunload', ()=> {
-  if(score > highScore){ localStorage.setItem('uf_highscore', score); }
-});
+/* -------------------------
+   Initial HUD update
+   ------------------------- */
+updateHUD();
+showMessage('Welcome — explore lakes, rivers and forests. Click to lock pointer and play.', 3500);
 
-///////////////////////
-// small helper examples for keyboard hold in reeling loop
-///////////////////////
-let reelingMouseDown = false;
-window.addEventListener('mousedown', (e)=> { if(e.button === 0) reelingMouseDown = true; });
-window.addEventListener('mouseup', (e)=> { if(e.button === 0) reelingMouseDown = false; });
-
-/* End of single-file game */
 </script>
 </body>
 </html>
